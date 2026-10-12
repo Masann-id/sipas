@@ -119,9 +119,151 @@ function testHistory(){const n=$('tAthlete').value;if(!n){$('testHistory').inner
 $('tAthlete').onchange=testHistory;
 async function saveAthletes(){const old=athletes.slice(),newA=[...document.querySelectorAll('.athName')].map((x,i)=>x.value.trim()||`Atlet ${i+1}`),meta=[...document.querySelectorAll('.athInfo')].map(x=>({info:x.value.trim()}));athletes=newA;athletesMeta=meta;persist();refreshSelects();renderAthletes();const payload={athletes:athletes.map((name,i)=>({name,info:meta[i]?.info||'',oldName:old[i]||''}))};const saved=API_URL?await api('saveAthletes',payload):null;alert(saved?'Data atlet tersimpan di perangkat dan server.':'Data atlet tersimpan di perangkat. Sinkronkan saat online.');dashboard()}
 function report(){const n=$('rAthlete').value;if(!n){$('reportBox').innerHTML='';return}const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);$('reportBox').innerHTML=`<h3>${esc(n)}</h3><div class="stats"><div class="stat"><b>${m.length}</b><span>Catatan</span></div><div class="stat"><b>${m.filter(x=>x.attendance==='Hadir').length}</b><span>Hadir</span></div><div class="stat"><b>${a}</b><span>Alpha</span></div></div><p><b>Status disiplin:</b> ${c.status} — ${c.action}</p><h4>Evaluasi</h4><div class="tablewrap"><table><tr><th>Tahap</th><th>Nilai</th><th>Kategori</th></tr>${e.map(x=>`<tr><td>${esc(x.stage)}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td></tr>`).join('')}</table></div><p><b>Perubahan M1→M12:</b> ${f&&l?(l.avg-f.avg).toFixed(2):'Belum lengkap'}</p><h4>Monitoring terakhir</h4>${m.slice(-5).reverse().map(x=>`<div class="item">${esc(x.date)} • ${esc(x.program)} • RPE ${esc(x.rpe)}<br><span class="badge">${esc(x.attendance||'Hadir')}</span><br><span class="small">${esc(x.notes||'-')}</span></div>`).join('')}`}
-async function api(action,data={}){if(!API_URL){setStatus('Belum terhubung ke database');return null}try{setStatus('Mengirim data...');const body=new URLSearchParams();body.set('action',action);body.set('payload',JSON.stringify(data));const r=await fetch(API_URL,{method:'POST',body});const j=await r.json();if(!j.ok)throw new Error(j.error||'Server error');setStatus('Data terkirim • '+new Date().toLocaleTimeString('id-ID'),true);return j}catch(err){setStatus('Tersimpan lokal • Server belum mengonfirmasi');return null}}
+function api(action,data={}){
+  return new Promise(function(resolve){
+    if(!API_URL){
+      setStatus('Belum terhubung ke database');
+      resolve(null);
+      return;
+    }
+
+    setStatus('Mengirim data ke database...');
+
+    var frameName='silatPostFrame_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    var iframe=document.createElement('iframe');
+    iframe.name=frameName;
+    iframe.style.display='none';
+
+    var form=document.createElement('form');
+    form.method='POST';
+    form.action=API_URL;
+    form.target=frameName;
+    form.style.display='none';
+
+    var actionInput=document.createElement('input');
+    actionInput.type='hidden';
+    actionInput.name='action';
+    actionInput.value=action;
+
+    var payloadInput=document.createElement('input');
+    payloadInput.type='hidden';
+    payloadInput.name='payload';
+    payloadInput.value=JSON.stringify(data);
+
+    form.appendChild(actionInput);
+    form.appendChild(payloadInput);
+
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+
+    var finished=false;
+
+    function cleanup(){
+      if(finished)return;
+      finished=true;
+      setTimeout(function(){
+        form.remove();
+        iframe.remove();
+      },500);
+    }
+
+    iframe.onload=function(){
+      cleanup();
+      setStatus('Data berhasil dikirim • '+new Date().toLocaleTimeString('id-ID'),true);
+      resolve({ok:true});
+    };
+
+    setTimeout(function(){
+      if(finished)return;
+      cleanup();
+      setStatus('Data dikirim • menunggu verifikasi...',true);
+      resolve({ok:true});
+    },5000);
+
+    try{
+      form.submit();
+    }catch(err){
+      cleanup();
+      setStatus('Gagal mengirim data ke server');
+      resolve(null);
+    }
+  });
+}
 function apiGet(action){return new Promise(resolve=>{if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}const callbackName='silatCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);const script=document.createElement('script');let selesai=false;let timer;function cleanup(){if(selesai)return;selesai=true;clearTimeout(timer);script.remove();delete window[callbackName]}timer=setTimeout(()=>{cleanup();setStatus('Offline/cache • Waktu koneksi habis');resolve(null)},20000);window[callbackName]=result=>{cleanup();if(!result||!result.ok){setStatus('Gagal membaca database');resolve(null);return}setStatus('Data berhasil dibaca • '+new Date().toLocaleTimeString('id-ID'),true);resolve(result)};script.onerror=()=>{cleanup();setStatus('Offline/cache • Gagal memuat respons API');resolve(null)};const separator=API_URL.includes('?')?'&':'?';script.src=API_URL+separator+'action='+encodeURIComponent(action)+'&callback='+encodeURIComponent(callbackName)+'&t='+Date.now();document.body.appendChild(script)})}
-async function syncNow(){if(!API_URL){alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');return}const result=await apiGet('bootstrap');if(!result)return;const d=result.data||{};const hasServer=(Array.isArray(d.athletes)&&d.athletes.length>0)||(d.monitoring||[]).length||(d.evaluations||[]).length||(d.tests||[]).length;if(!hasServer){const upload=await api('saveAll',{athletes:athletes.map((name,i)=>({name,info:athletesMeta[i]?.info||'',oldName:''})),monitoring:mon,evaluations:ev,tests});if(upload){setStatus('Data lokal berhasil diunggah',true);return}setStatus('Database terbaca kosong; pengiriman perlu diperiksa');alert('Database berhasil dibaca tetapi masih kosong. Data lokal belum dapat dipastikan terkirim. Coba lagi saat online.');return}if(!confirm('Database berisi data. Muat data server ke perangkat ini? Data lokal yang belum tersinkron dapat tertimpa.'))return;athletes=(d.athletes||[]).map(x=>x.name);athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));mon=d.monitoring||[];ev=(d.evaluations||[]).map(x=>({...x,scores:typeof x.scores==='string'?safeJson(x.scores,{}):x.scores||{}}));tests=d.tests||[];persist();refreshSelects();renderAthletes();dashboard();overview();loadEval();testHistory();report();setStatus('Sinkronisasi selesai • '+new Date().toLocaleTimeString('id-ID'),true)}
+async function syncNow(){
+  if(!API_URL){
+    alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');
+    return;
+  }
+
+  const result=await apiGet('bootstrap');
+  if(!result)return;
+
+  const d=result.data||{};
+  const hasServer=
+    (Array.isArray(d.athletes)&&d.athletes.length>0)||
+    (d.monitoring||[]).length||
+    (d.evaluations||[]).length||
+    (d.tests||[]).length;
+
+  if(!hasServer){
+    const upload=await api('saveAll',{
+      athletes:athletes.map((name,i)=>({
+        name:name,
+        info:athletesMeta[i]?.info||'',
+        oldName:''
+      })),
+      monitoring:mon,
+      evaluations:ev,
+      tests:tests
+    });
+
+    if(!upload){
+      setStatus('Pengiriman gagal');
+      alert('Data belum dapat dikirim ke database.');
+      return;
+    }
+
+    setStatus('Memeriksa data di server...');
+
+    await new Promise(function(resolve){
+      setTimeout(resolve,2000);
+    });
+
+    const verify=await apiGet('bootstrap');
+
+    if(verify){
+      const vd=verify.data||{};
+      const serverCount=
+        (vd.athletes||[]).length+
+        (vd.monitoring||[]).length+
+        (vd.evaluations||[]).length+
+        (vd.tests||[]).length;
+
+      if(serverCount>0){
+        setStatus('Database berhasil diisi • '+new Date().toLocaleTimeString('id-ID'),true);
+        alert('Berhasil. Data lokal sudah masuk ke Google Sheets.');
+        return;
+      }
+    }
+
+    setStatus('Database terbaca kosong; pengiriman perlu diperiksa');
+    alert('Pengiriman sudah dilakukan, tetapi server belum menunjukkan data. Silakan coba Sinkronkan sekali lagi.');
+    return;
+  }
+
+  if(!confirm('Database berisi data. Muat data server ke perangkat ini? Data lokal yang belum tersinkron dapat tertimpa.'))return;
+
+  athletes=(d.athletes||[]).map(x=>x.name);
+  athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));
+  mon=d.monitoring||[];
+  ev=d.evaluations||[];
+  tests=d.tests||[];
+
+  saveLocal();
+  renderAll();
+  setStatus('Data server berhasil dimuat',true);
+}
 function safeJson(s,f){try{return JSON.parse(s)}catch(e){return f}}
 init();
 </script>
