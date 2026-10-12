@@ -20,24 +20,24 @@ label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,selec
 @media(max-width:440px){.grid{grid-template-columns:1fr}.nav{grid-template-columns:repeat(2,1fr)}}
 </style><script>window.SILAT_API_URL="https://script.google.com/macros/s/AKfycbz9ABFiT1MqMWDy9KlFfkga7VBGY4lCDruEN68Sft3ShbCp1s5inBF4KHhvZJF3b_qV/exec";</script></head>
 <body>
-<header><h1>🥋 Silat Athlete Manager</h1><small>Online + Offline • Program 12 Minggu</small><div id="syncStatus" style="margin-top:8px;font-size:11px;color:#cbd5e1">Belum terhubung ke database</div></header>
+<header><h1>ðŸ¥‹ Silat Athlete Manager</h1><small>Online + Offline â€¢ Program 12 Minggu</small><div id="syncStatus" style="margin-top:8px;font-size:11px;color:#cbd5e1">Belum terhubung ke database</div></header>
 <main>
 <div class="nav">
-<button id="nDashboard" onclick="page('dashboard')">📊 Dashboard</button>
-<button id="nMonitor" onclick="page('monitor')">📝 Monitoring</button>
-<button id="nEval" onclick="page('eval')">🏆 Evaluasi</button>
-<button id="nTest" onclick="page('test')">⏱ Tes Fisik</button>
-<button id="nAthlete" onclick="page('athlete')">👤 Atlet</button>
-<button id="nReport" onclick="page('report')">📄 Laporan</button>
-<button id="nPolicy" onclick="page('policy')">⚖️ Aturan</button>
-<button onclick="syncNow()">☁️ Sinkronkan</button>
+<button id="nDashboard" onclick="page('dashboard')">ðŸ“Š Dashboard</button>
+<button id="nMonitor" onclick="page('monitor')">ðŸ“ Monitoring</button>
+<button id="nEval" onclick="page('eval')">ðŸ† Evaluasi</button>
+<button id="nTest" onclick="page('test')">â± Tes Fisik</button>
+<button id="nAthlete" onclick="page('athlete')">ðŸ‘¤ Atlet</button>
+<button id="nReport" onclick="page('report')">ðŸ“„ Laporan</button>
+<button id="nPolicy" onclick="page('policy')">âš–ï¸ Aturan</button>
+<button onclick="syncNow()">â˜ï¸ Sinkronkan</button>
 </div>
 
 <section id="dashboard">
-<div class="card"><h2>☁️ Koneksi Database</h2>
+<div class="card"><h2>â˜ï¸ Koneksi Database</h2>
 <p class="small">Masukkan URL Web App Google Apps Script setelah deployment. Data tetap disimpan di perangkat sebagai cache offline, lalu disinkronkan ke Google Sheets saat online.</p>
 <input id="apiUrl" placeholder="https://script.google.com/macros/s/....../exec">
-<div class="grid"><button class="btn primary" onclick="saveApiUrl()">💾 Simpan URL</button><button class="btn muted" onclick="syncNow()">☁️ Sinkronkan Sekarang</button></div>
+<div class="grid"><button class="btn primary" onclick="saveApiUrl()">ðŸ’¾ Simpan URL</button><button class="btn muted" onclick="syncNow()">â˜ï¸ Sinkronkan Sekarang</button></div>
 </div>
 <div class="card"><h2>Dashboard Atlet</h2><select id="dashAthlete" onchange="dashboard()"></select><div id="dash"></div></div>
 <div class="card"><h2>Ringkasan 25 Atlet</h2><div class="tablewrap"><table><thead><tr><th>Atlet</th><th>Catatan</th><th>Hadir</th><th>Alpha</th><th>Status</th><th>Perubahan</th></tr></thead><tbody id="overview"></tbody></table></div></div>
@@ -55,11 +55,11 @@ label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,selec
 <div class="grid"><div><label>Durasi (menit)</label><input id="mDuration" type="number" min="1" value="60"></div><div><label>Kondisi Sebelum</label><select id="mBefore"><option>Sangat Baik</option><option>Baik</option><option>Cukup</option><option>Kurang</option></select></div></div>
 <label>RPE</label><div class="rpe" id="rpebox"></div>
 <div class="grid"><div><label>Kondisi Sesudah</label><select id="mAfter"><option>Baik</option><option>Lelah Ringan</option><option>Lelah</option><option>Sangat Lelah</option></select></div><div><label>Keluhan</label><select id="mComplaint"><option>Tidak ada</option><option>Nyeri ringan</option><option>Pegal berlebih</option><option>Pusing</option><option>Keluhan lain</option></select></div></div>
-<label>Catatan</label><textarea id="mNotes"></textarea><button class="btn primary">💾 Simpan Monitoring</button></form></div>
+<label>Catatan</label><textarea id="mNotes"></textarea><button class="btn primary">ðŸ’¾ Simpan Monitoring</button></form></div>
 </section>
 
 <section id="eval" class="hidden">
-<div class="card"><h2>Evaluasi 12 Indikator</h2><select id="eAthlete" onchange="loadEval()"></select><div class="grid"><div><label>Tahap</label><select id="eStage"><option value="M1">Minggu 1</option><option value="M4">Minggu 4</option><option value="M8">Minggu 8</option><option value="M12">Minggu 12</option></select></div><div><label>Catatan</label><input id="eNote"></div></div><div id="scoreInputs"></div><button class="btn primary" onclick="saveEval()">💾 Simpan Evaluasi</button></div>
+<div class="card"><h2>Evaluasi 12 Indikator</h2><select id="eAthlete" onchange="loadEval()"></select><div class="grid"><div><label>Tahap</label><select id="eStage"><option value="M1">Minggu 1</option><option value="M4">Minggu 4</option><option value="M8">Minggu 8</option><option value="M12">Minggu 12</option></select></div><div><label>Catatan</label><input id="eNote"></div></div><div id="scoreInputs"></div><button class="btn primary" onclick="saveEval()">ðŸ’¾ Simpan Evaluasi</button></div>
 <div class="card"><h2>Perkembangan Atlet</h2><div id="evalHistory"></div></div>
 </section>
 
@@ -69,8 +69,8 @@ label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,selec
 <div><label>Speed (detik)</label><input id="speed" type="number" step=".01"></div><div><label>Power (cm)</label><input id="power" type="number" step=".1"></div>
 <div><label>Agility (detik)</label><input id="agility" type="number" step=".01"></div><div><label>Stamina (menit/ronde)</label><input id="stamina" type="number" step=".1"></div>
 <div><label>Reaction (detik)</label><input id="reaction" type="number" step=".01"></div></div>
-<p class="small">Nilai tes fisik disimpan sebagai hasil mentah. Standar skor 1–5 sebaiknya ditentukan setelah protokol tes dan kelompok usia/jenis kelamin ditetapkan.</p>
-<button class="btn primary" onclick="saveTest()">💾 Simpan Tes</button></div>
+<p class="small">Nilai tes fisik disimpan sebagai hasil mentah. Standar skor 1â€“5 sebaiknya ditentukan setelah protokol tes dan kelompok usia/jenis kelamin ditetapkan.</p>
+<button class="btn primary" onclick="saveTest()">ðŸ’¾ Simpan Tes</button></div>
 <div class="card"><h2>Riwayat Tes</h2><div id="testHistory"></div></div>
 </section>
 
@@ -79,21 +79,21 @@ label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,selec
 <p class="small">Jumlah atlet tidak dibatasi 25. Tambahkan atlet kapan saja.</p>
 <div id="athleteInputs"></div>
 <div class="grid">
-<button class="btn muted" onclick="addAthlete()">➕ Tambah Atlet</button>
-<button class="btn danger" onclick="removeLastAthlete()">➖ Hapus Atlet Terakhir</button>
+<button class="btn muted" onclick="addAthlete()">âž• Tambah Atlet</button>
+<button class="btn danger" onclick="removeLastAthlete()">âž– Hapus Atlet Terakhir</button>
 </div>
-<button class="btn primary" onclick="saveAthletes()">💾 Simpan Data Atlet</button>
+<button class="btn primary" onclick="saveAthletes()">ðŸ’¾ Simpan Data Atlet</button>
 </div></section>
 
 <section id="policy" class="hidden">
-<div class="card"><h2>⚖️ Aturan Kehadiran & Konsekuensi</h2>
+<div class="card"><h2>âš–ï¸ Aturan Kehadiran & Konsekuensi</h2>
 <p class="small">Agar tegas tetapi tetap mendidik, sistem menggunakan tahapan konsekuensi. "Tanpa Keterangan" dihitung sebagai alpha. Izin/sakit tidak dihitung sebagai alpha jika dicatat dengan benar.</p>
-<div class="item"><b>0–1 Alpha</b><br><span class="small">Status: Aman. Pelatih memberi pengingat ringan jika mulai sering tidak hadir.</span></div>
+<div class="item"><b>0â€“1 Alpha</b><br><span class="small">Status: Aman. Pelatih memberi pengingat ringan jika mulai sering tidak hadir.</span></div>
 <div class="item"><b>2 Alpha</b><br><span class="small">Status: Peringatan I. Siswa diberi teguran dan target perbaikan kehadiran; orang tua/wali diberi informasi.</span></div>
 <div class="item"><b>3 Alpha</b><br><span class="small">Status: Peringatan II / Pembinaan. Ada pembinaan khusus dan komunikasi dengan orang tua/wali.</span></div>
 <div class="item"><b>4 Alpha</b><br><span class="small">Status: Probation. Siswa tidak diprioritaskan untuk pertandingan sampai disiplin membaik dan pelatih menyatakan layak kembali.</span></div>
 <div class="item"><b>5+ Alpha</b><br><span class="small">Status: Rekomendasi dicoret dari program/skuad pertandingan. Keputusan akhir tetap oleh pelatih/pengelola setelah mempertimbangkan alasan dan kondisi siswa.</span></div>
-<p class="small"><b>Catatan:</b> Untuk siswa SMP, saya menyarankan jangan langsung mencoret pada 1–2 kali alpha. Beri kesempatan memperbaiki disiplin dan libatkan orang tua/wali sebelum keputusan pencoretan.</p>
+<p class="small"><b>Catatan:</b> Untuk siswa SMP, saya menyarankan jangan langsung mencoret pada 1â€“2 kali alpha. Beri kesempatan memperbaiki disiplin dan libatkan orang tua/wali sebelum keputusan pencoretan.</p>
 </div>
 <div class="card"><h2>Aturan yang Disarankan</h2>
 <ul class="small">
@@ -104,7 +104,7 @@ label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,selec
 </ul></div>
 </section>
 <section id="report" class="hidden">
-<div class="card"><h2>Laporan Atlet</h2><select id="rAthlete" onchange="report()"></select><div id="reportBox"></div><button class="btn muted" onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div>
+<div class="card"><h2>Laporan Atlet</h2><select id="rAthlete" onchange="report()"></select><div id="reportBox"></div><button class="btn muted" onclick="window.print()">ðŸ–¨ï¸ Cetak / Simpan PDF</button></div>
 </section>
 </main>
 
@@ -126,7 +126,7 @@ function consequence(alpha){
  if(alpha===4)return {status:'Probation',action:'4 alpha: tidak diprioritaskan untuk pertandingan sampai disiplin membaik.'};
  if(alpha===3)return {status:'Peringatan II',action:'3 alpha: pembinaan khusus + komunikasi dengan orang tua/wali.'};
  if(alpha===2)return {status:'Peringatan I',action:'2 alpha: teguran + informasi kepada orang tua/wali.'};
- return {status:'Aman',action:'0–1 alpha: masih dalam batas aman, tetapi tetap dipantau.'};
+ return {status:'Aman',action:'0â€“1 alpha: masih dalam batas aman, tetapi tetap dipantau.'};
 }
 function renderAthletes(){
  $('athleteInputs').innerHTML=athletes.map((n,i)=>`<div class="grid" style="margin-bottom:6px"><div><label>Atlet ${i+1}</label><input class="athName" data-i="${i}" value="${esc(n)}"></div><div><label>Kelas/Keterangan</label><input class="athInfo" data-i="${i}" value="${esc((athletesMeta[i]&&athletesMeta[i].info)||'')}"></div></div>`).join('');
@@ -139,7 +139,7 @@ function init(){
  $('mDate').value=new Date().toISOString().slice(0,10);$('tDate').value=$('mDate').value;
  $('rpebox').innerHTML=Array.from({length:10},(_,i)=>`<input id="rp${i+1}" name="rpe" type="radio" value="${i+1}"><label for="rp${i+1}">${i+1}</label>`).join('');
  renderAthletes();
- $('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1–5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1–5">`).join('');
+ $('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1â€“5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1â€“5">`).join('');
  $('apiUrl').value=API_URL;
  dashboard();overview();setStatus(API_URL?'Siap sinkronisasi':'Belum terhubung ke database');
  if(API_URL) setTimeout(syncNow,500);
@@ -150,7 +150,7 @@ function dashboard(){
  const mm=mon.filter(x=>x.athlete===n),ee=ev.filter(x=>x.athlete===n),tt=tests.filter(x=>x.athlete===n);
  const unexcused=mm.filter(x=>x.attendance==='Tanpa Keterangan').length,hadir=mm.filter(x=>x.attendance==='Hadir').length,avg=mm.length?(mm.reduce((a,b)=>a+b.rpe,0)/mm.length).toFixed(1):'-';
  const latest=ee.length?ee[ee.length-1]:null,first=ee.find(x=>x.stage==='M1'),last=ee.find(x=>x.stage==='M12');
- $('dash').innerHTML=`<div class="stats"><div class="stat"><b>${mm.length}</b><span>Catatan</span></div><div class="stat"><b>${hadir}</b><span>Hadir</span></div><div class="stat"><b>${unexcused}</b><span>Alpha</span></div></div><div class="item"><b>Status disiplin</b><br><span class="badge ${unexcused>=4?'bad':unexcused>=2?'warn':'good'}">${consequence(unexcused).status}</span><br><span class="small">${consequence(unexcused).action}</span></div><div class="item"><b>Evaluasi</b><br><span class="small">${latest?latest.stage+' • rata-rata '+Number(latest.avg).toFixed(2):'Belum ada evaluasi'}</span></div><div class="item"><b>Perkembangan M1 → M12</b><br><span class="small">${first&&last?((last.avg-first.avg)>=0?'+':'')+(last.avg-first.avg).toFixed(2):'Belum lengkap'}</span></div>`;
+ $('dash').innerHTML=`<div class="stats"><div class="stat"><b>${mm.length}</b><span>Catatan</span></div><div class="stat"><b>${hadir}</b><span>Hadir</span></div><div class="stat"><b>${unexcused}</b><span>Alpha</span></div></div><div class="item"><b>Status disiplin</b><br><span class="badge ${unexcused>=4?'bad':unexcused>=2?'warn':'good'}">${consequence(unexcused).status}</span><br><span class="small">${consequence(unexcused).action}</span></div><div class="item"><b>Evaluasi</b><br><span class="small">${latest?latest.stage+' â€¢ rata-rata '+Number(latest.avg).toFixed(2):'Belum ada evaluasi'}</span></div><div class="item"><b>Perkembangan M1 â†’ M12</b><br><span class="small">${first&&last?((last.avg-first.avg)>=0?'+':'')+(last.avg-first.avg).toFixed(2):'Belum lengkap'}</span></div>`;
  overview()
 }
 function overview(){
@@ -173,20 +173,49 @@ async function saveAthletes(){
  if(API_URL)await api('saveAthletes',{athletes:athletes.map((name,i)=>({name,info:meta[i]?.info||'',oldName:old[i]||''}))});
  alert('Data atlet tersimpan.');
 }
-function report(){let n=$('rAthlete').value;if(!n){$('reportBox').innerHTML='';return}let m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),first=e.find(x=>x.stage==='M1'),last=e.find(x=>x.stage==='M12'),alpha=m.filter(x=>x.attendance==='Tanpa Keterangan').length;$('reportBox').innerHTML=`<h3>${esc(n)}</h3><div class="stats"><div class="stat"><b>${m.length}</b><span>Catatan</span></div><div class="stat"><b>${m.filter(x=>x.attendance==='Hadir').length}</b><span>Hadir</span></div><div class="stat"><b>${alpha}</b><span>Alpha</span></div></div><p><b>Status disiplin:</b> ${consequence(alpha).status} — ${consequence(alpha).action}</p><h4>Evaluasi</h4><div class="tablewrap"><table><tr><th>Tahap</th><th>Nilai</th><th>Kategori</th></tr>${e.map(x=>`<tr><td>${x.stage}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td></tr>`).join('')}</table></div><p><b>Perubahan M1→M12:</b> ${first&&last?(last.avg-first.avg).toFixed(2):'Belum lengkap'}</p><h4>Monitoring terakhir</h4>${m.slice(-5).reverse().map(x=>`<div class="item">${x.date} • ${x.program} • RPE ${x.rpe}<br><span class="badge">${x.attendance||'Hadir'}</span><br><span class="small">${esc(x.notes||'-')}</span></div>`).join('')}`}
+function report(){let n=$('rAthlete').value;if(!n){$('reportBox').innerHTML='';return}let m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),first=e.find(x=>x.stage==='M1'),last=e.find(x=>x.stage==='M12'),alpha=m.filter(x=>x.attendance==='Tanpa Keterangan').length;$('reportBox').innerHTML=`<h3>${esc(n)}</h3><div class="stats"><div class="stat"><b>${m.length}</b><span>Catatan</span></div><div class="stat"><b>${m.filter(x=>x.attendance==='Hadir').length}</b><span>Hadir</span></div><div class="stat"><b>${alpha}</b><span>Alpha</span></div></div><p><b>Status disiplin:</b> ${consequence(alpha).status} â€” ${consequence(alpha).action}</p><h4>Evaluasi</h4><div class="tablewrap"><table><tr><th>Tahap</th><th>Nilai</th><th>Kategori</th></tr>${e.map(x=>`<tr><td>${x.stage}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td></tr>`).join('')}</table></div><p><b>Perubahan M1â†’M12:</b> ${first&&last?(last.avg-first.avg).toFixed(2):'Belum lengkap'}</p><h4>Monitoring terakhir</h4>${m.slice(-5).reverse().map(x=>`<div class="item">${x.date} â€¢ ${x.program} â€¢ RPE ${x.rpe}<br><span class="badge">${x.attendance||'Hadir'}</span><br><span class="small">${esc(x.notes||'-')}</span></div>`).join('')}`}
 async function api(action,data={}){
  if(!API_URL){setStatus('Belum terhubung ke database');return null}
  try{
   setStatus('Menyinkronkan...');
-  const body=new URLSearchParams();body.set('action',action);body.set('payload',JSON.stringify(data));
+  const body=new URLSearchParams();
+  body.set('action',action);
+  body.set('payload',JSON.stringify(data));
   const r=await fetch(API_URL,{method:'POST',body});
-  const j=await r.json();if(!j.ok)throw new Error(j.error||'Server error');
-  setStatus('Terhubung • '+new Date().toLocaleTimeString('id-ID'),true);return j;
- }catch(err){setStatus('Offline/cache • '+err.message);return null}
+  const j=await r.json();
+  if(!j.ok)throw new Error(j.error||'Server error');
+  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);
+  return j;
+ }catch(err){
+  setStatus('Offline/cache â€¢ '+err.message);
+  return null;
+ }
+}
+async function apiGet(action,data={}){
+ if(!API_URL){setStatus('Belum terhubung ke database');return null}
+ try{
+  setStatus('Menghubungkan...');
+  const qs=new URLSearchParams();
+  qs.set('action',action);
+  qs.set('payload',JSON.stringify(data));
+  qs.set('t',Date.now());
+  const r=await fetch(API_URL+'?'+qs.toString(),{
+    method:'GET',
+    cache:'no-store',
+    redirect:'follow'
+  });
+  const j=await r.json();
+  if(!j.ok)throw new Error(j.error||'Server error');
+  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);
+  return j;
+ }catch(err){
+  setStatus('Offline/cache â€¢ '+err.message);
+  return null;
+ }
 }
 async function syncNow(){
  if(!API_URL){alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');return}
- const result=await api('bootstrap');
+ const result=await apiGet('bootstrap');
  if(!result)return;
  const d=result.data||{};
  // Server is authoritative only when it has data; otherwise upload current local cache.
@@ -199,7 +228,7 @@ async function syncNow(){
  mon=d.monitoring||[];ev=d.evaluations||[];tests=d.tests||[];
  localStorage.setItem(K.ath,JSON.stringify(athletes));localStorage.setItem('silat_athletes_meta',JSON.stringify(athletesMeta));localStorage.setItem(K.mon,JSON.stringify(mon));localStorage.setItem(K.ev,JSON.stringify(ev));localStorage.setItem(K.test,JSON.stringify(tests));
  ['dashAthlete','mAthlete','eAthlete','tAthlete','rAthlete'].forEach(opts);renderAthletes();dashboard();overview();loadEval();testHistory();report();
- setStatus('Sinkronisasi selesai • '+new Date().toLocaleTimeString('id-ID'),true);
+ setStatus('Sinkronisasi selesai â€¢ '+new Date().toLocaleTimeString('id-ID'),true);
 }
 init();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 </script>
