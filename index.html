@@ -90,6 +90,20 @@ const indicators=['Teknik','Footwork','Kecepatan','Power','Agility','Stamina','R
 const $=id=>document.getElementById(id);
 function readLocal(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch(e){return fallback}}
 function persist(){localStorage.setItem(K.ath,JSON.stringify(athletes));localStorage.setItem('silat_athletes_meta',JSON.stringify(athletesMeta));localStorage.setItem(K.mon,JSON.stringify(mon));localStorage.setItem(K.ev,JSON.stringify(ev));localStorage.setItem(K.test,JSON.stringify(tests))}
+function hasRealLocalData(){
+  const defaultOnly=athletes.length===25 && athletes.every((x,i)=>x===`Atlet ${String(i+1).padStart(2,'0')}`);
+  return !defaultOnly || mon.length>0 || ev.length>0 || tests.length>0;
+}
+function applyServerData(d){
+  athletes=(d.athletes||[]).map(x=>x.name).filter(Boolean);
+  athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));
+  mon=d.monitoring||[];
+  ev=d.evaluations||[];
+  tests=d.tests||[];
+  persist();
+  renderAll();
+}
+
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function setStatus(t,ok=false){const x=$('syncStatus');x.textContent=t;x.style.color=ok?'#86efac':'#cbd5e1'}
 function saveApiUrl(){API_URL=$('apiUrl').value.trim();localStorage.setItem('silat_api_url',API_URL);setStatus(API_URL?'URL database tersimpan':'Belum terhubung ke database');if(API_URL)syncNow()}
@@ -104,7 +118,7 @@ refreshSelects();$('mWeek').innerHTML=Array.from({length:12},(_,i)=>`<option>Min
 const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);$('mDate').value=localDate;$('tDate').value=localDate;
 $('rpebox').innerHTML=Array.from({length:10},(_,i)=>`<input id="rp${i+1}" name="rpe" type="radio" value="${i+1}"><label for="rp${i+1}">${i+1}</label>`).join('');
 renderAthletes();$('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1–5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1–5">`).join('');
-$('apiUrl').value=API_URL;dashboard();overview();setStatus(API_URL?'Siap sinkronisasi':'Belum terhubung ke database');}
+$('apiUrl').value=API_URL;dashboard();overview();setStatus(API_URL?'Menghubungkan ke database...':'Belum terhubung ke database');if(API_URL)setTimeout(autoSync,600);}
 function page(p){['dashboard','monitor','eval','test','athlete','report','policy'].forEach(x=>$(x).classList.toggle('hidden',x!==p));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));const map={dashboard:'nDashboard',monitor:'nMonitor',eval:'nEval',test:'nTest',athlete:'nAthlete',report:'nReport',policy:'nPolicy'};if(map[p])$(map[p]).classList.add('active');if(p==='dashboard')dashboard();if(p==='eval')loadEval();if(p==='test')testHistory();if(p==='report')report()}
 function dashboard(){const n=$('dashAthlete').value;if(!n){$('dash').innerHTML='<p class="small">Pilih atlet.</p>';overview();return}const mm=mon.filter(x=>x.athlete===n),ee=ev.filter(x=>x.athlete===n);const alpha=mm.filter(x=>x.attendance==='Tanpa Keterangan').length,hadir=mm.filter(x=>x.attendance==='Hadir').length,latest=ee[ee.length-1],first=ee.find(x=>x.stage==='M1'),last=ee.find(x=>x.stage==='M12'),c=consequence(alpha);$('dash').innerHTML=`<div class="stats"><div class="stat"><b>${mm.length}</b><span>Catatan</span></div><div class="stat"><b>${hadir}</b><span>Hadir</span></div><div class="stat"><b>${alpha}</b><span>Alpha</span></div></div><div class="item"><b>Status disiplin</b><br><span class="badge ${alpha>=4?'bad':alpha>=2?'warn':'good'}">${c.status}</span><br><span class="small">${c.action}</span></div><div class="item"><b>Evaluasi terakhir</b><br><span class="small">${latest?latest.stage+' • rata-rata '+Number(latest.avg).toFixed(2):'Belum ada evaluasi'}</span></div><div class="item"><b>Perkembangan M1 → M12</b><br><span class="small">${first&&last?((last.avg-first.avg)>=0?'+':'')+(last.avg-first.avg).toFixed(2):'Belum lengkap'}</span></div>`;overview()}
 function overview(){$('overview').innerHTML=athletes.map(n=>{const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),h=m.filter(x=>x.attendance==='Hadir').length,a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);return `<tr><td>${esc(n)}</td><td>${m.length}</td><td>${h}</td><td>${a}</td><td><span class="badge ${a>=4?'bad':a>=2?'warn':'good'}">${c.status}</span></td><td>${f&&l?(l.avg-f.avg).toFixed(2):'-'}</td></tr>`}).join('')}
@@ -264,6 +278,51 @@ async function syncNow(){
   renderAll();
   setStatus('Data server berhasil dimuat',true);
 }
+
+async function autoSync(){
+  if(!API_URL)return;
+  const result=await apiGet('bootstrap');
+  if(!result)return;
+
+  const d=result.data||{};
+  const serverAth=d.athletes||[];
+  const serverMon=d.monitoring||[];
+  const serverEv=d.evaluations||[];
+  const serverTests=d.tests||[];
+  const serverHasData=serverAth.length>0||serverMon.length>0||serverEv.length>0||serverTests.length>0;
+
+  if(serverHasData){
+    applyServerData(d);
+    setStatus('Online • data terbaru dari database',true);
+    return;
+  }
+
+  if(hasRealLocalData()){
+    const sent=await api('saveAll',{
+      athletes:athletes.map((name,i)=>({
+        name:name,
+        info:athletesMeta[i]?.info||'',
+        oldName:''
+      })),
+      monitoring:mon,
+      evaluations:ev,
+      tests:tests
+    });
+    if(sent){
+      setStatus('Online • data perangkat dikirim ke database',true);
+    }
+  }else{
+    setStatus('Online • database siap',true);
+  }
+}
+
+let autoSyncTimer=null;
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible' && API_URL){
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer=setTimeout(autoSync,500);
+  }
+});
 function safeJson(s,f){try{return JSON.parse(s)}catch(e){return f}}
 init();
 </script>
