@@ -114,7 +114,7 @@ const defaults=Array.from({length:25},(_,i)=>`Atlet ${String(i+1).padStart(2,'0'
 let athletes=JSON.parse(localStorage.getItem(K.ath)||'null')||defaults;
 let athletesMeta=JSON.parse(localStorage.getItem('silat_athletes_meta')||'[]');
 let mon=JSON.parse(localStorage.getItem(K.mon)||'[]'), ev=JSON.parse(localStorage.getItem(K.ev)||'[]'), tests=JSON.parse(localStorage.getItem(K.test)||'[]');
-let API_URL=localStorage.getItem('silat_api_url')||'';
+let API_URL=localStorage.getItem('silat_api_url')||window.SILAT_API_URL||'';
 const indicators=['Teknik','Footwork','Kecepatan','Power','Agility','Stamina','Reaction','Taktik','Sparring','Disiplin','Latihan Mandiri','Mental'];
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
@@ -178,40 +178,20 @@ async function api(action,data={}){
  if(!API_URL){setStatus('Belum terhubung ke database');return null}
  try{
   setStatus('Menyinkronkan...');
-  const body=new URLSearchParams();
-  body.set('action',action);
-  body.set('payload',JSON.stringify(data));
+  const body=new URLSearchParams();body.set('action',action);body.set('payload',JSON.stringify(data));
   const r=await fetch(API_URL,{method:'POST',body});
-  const j=await r.json();
-  if(!j.ok)throw new Error(j.error||'Server error');
-  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);
-  return j;
- }catch(err){
-  setStatus('Offline/cache â€¢ '+err.message);
-  return null;
- }
+  const j=await r.json();if(!j.ok)throw new Error(j.error||'Server error');
+  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);return j;
+ }catch(err){setStatus('Offline/cache â€¢ '+err.message);return null}
 }
-async function apiGet(action,data={}){
+async function apiGet(action){
  if(!API_URL){setStatus('Belum terhubung ke database');return null}
  try{
-  setStatus('Menghubungkan...');
-  const qs=new URLSearchParams();
-  qs.set('action',action);
-  qs.set('payload',JSON.stringify(data));
-  qs.set('t',Date.now());
-  const r=await fetch(API_URL+'?'+qs.toString(),{
-    method:'GET',
-    cache:'no-store',
-    redirect:'follow'
-  });
-  const j=await r.json();
-  if(!j.ok)throw new Error(j.error||'Server error');
-  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);
-  return j;
- }catch(err){
-  setStatus('Offline/cache â€¢ '+err.message);
-  return null;
- }
+  setStatus('Menyinkronkan...');
+  const r=await fetch(API_URL+'?action='+encodeURIComponent(action)+'&t='+Date.now(),{method:'GET',cache:'no-store',redirect:'follow'});
+  const j=await r.json();if(!j.ok)throw new Error(j.error||'Server error');
+  setStatus('Terhubung â€¢ '+new Date().toLocaleTimeString('id-ID'),true);return j;
+ }catch(err){setStatus('Offline/cache â€¢ '+err.message);return null}
 }
 async function syncNow(){
  if(!API_URL){alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');return}
@@ -232,30 +212,7 @@ async function syncNow(){
 }
 init();if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
 </script>
-<script>
-/*
-  ONLINE CONNECTION PATCH
-  Uses a simple GET probe so the browser can test the Apps Script endpoint
-  without a CORS preflight.
-*/
-window.SILAT_API_URL = window.SILAT_API_URL || "https://script.google.com/macros/s/AKfycbz9ABFiT1MqMWDy9KlFfkga7VBGY4lCDruEN68Sft3ShbCp1s5inBF4KHhvZJF3b_qV/exec";
+<script>window.SILAT_API_URL = window.SILAT_API_URL || "https://script.google.com/macros/s/AKfycbz9ABFiT1MqMWDy9KlFfkga7VBGY4lCDruEN68Sft3ShbCp1s5inBF4KHhvZJF3b_qV/exec";</script>
 
-window.silatCheckOnline = async function () {
-  try {
-    const url = window.SILAT_API_URL + "?t=" + Date.now();
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      redirect: "follow"
-    });
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    const data = await response.json();
-    return !!(data && data.ok);
-  } catch (err) {
-    console.warn("Silat API check failed:", err);
-    return false;
-  }
-};
-</script>
 
 </body></html>
