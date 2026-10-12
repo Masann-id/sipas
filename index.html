@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Silat Athlete Manager</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+header{background:#0f172a;color:#fff;padding:18px;position:sticky;top:0;z-index:10}header h1{font-size:20px;margin:0 0 4px}header small{color:#cbd5e1}
+main{max-width:900px;margin:auto;padding:12px 12px 80px}.nav{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0}.nav button{border:0;border-radius:10px;padding:11px;font-weight:700;background:#e2e8f0;color:#0f172a}.nav button.active{background:#0f172a;color:#fff}
+.card{background:#fff;border-radius:15px;padding:15px;margin:10px 0;box-shadow:0 2px 8px #0000000d}h2{font-size:17px;margin:0 0 12px}
+label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:10px;background:#fff}textarea{min-height:70px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btn{width:100%;border:0;border-radius:9px;padding:11px;font-weight:700;margin-top:10px;cursor:pointer}.primary{background:#0f172a;color:#fff}.muted{background:#e2e8f0;color:#0f172a}.danger{background:#fee2e2;color:#991b1b}
+.hidden{display:none!important}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.stat{background:#f8fafc;padding:10px;border-radius:10px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:10px;color:#64748b}
+.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid #e2e8f0;padding:7px;text-align:left;white-space:nowrap}
+.badge{display:inline-block;padding:4px 7px;border-radius:99px;background:#e2e8f0;font-size:11px}.good{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.bad{background:#fee2e2;color:#991b1b}
+.rpe{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}.rpe input{display:none}.rpe label{text-align:center;border:1px solid #cbd5e1;padding:8px 0;border-radius:7px;margin:0}.rpe input:checked+label{background:#0f172a;color:#fff}
+.scoregrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.small{font-size:11px;color:#64748b;line-height:1.5}.item{padding:10px 0;border-bottom:1px solid #e2e8f0}.item:last-child{border-bottom:0}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.nav{grid-template-columns:repeat(2,1fr)}}
+@media print{header,.nav,.noprint,button{display:none!important}body{background:#fff}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}main{max-width:none;padding:0}}
+</style>
+</head>
+<body>
+<header><h1>🥋 Silat Athlete Manager</h1><small>Online + Offline • Program 12 Minggu</small><div id="syncStatus" style="margin-top:8px;font-size:11px;color:#cbd5e1">Memuat aplikasi...</div></header>
+<main>
+<div class="nav noprint">
+<button id="nDashboard" onclick="page('dashboard')">📊 Dashboard</button>
+<button id="nMonitor" onclick="page('monitor')">📝 Monitoring</button>
+<button id="nEval" onclick="page('eval')">🏆 Evaluasi</button>
+<button id="nTest" onclick="page('test')">⏱ Tes Fisik</button>
+<button id="nAthlete" onclick="page('athlete')">👤 Atlet</button>
+<button id="nReport" onclick="page('report')">📄 Laporan</button>
+<button id="nPolicy" onclick="page('policy')">⚖️ Aturan</button>
+<button onclick="syncNow()">☁️ Sinkronkan</button>
+</div>
+
+<section id="dashboard">
+<div class="card"><h2>☁️ Koneksi Database</h2>
+<p class="small">URL Apps Script sudah diisi. Data tersimpan di perangkat sebagai cache offline. Saat online, tekan Sinkronkan untuk membaca atau mengirim data ke Google Sheets.</p>
+<input id="apiUrl" placeholder="URL Web App Google Apps Script">
+<div class="grid"><button class="btn primary" onclick="saveApiUrl()">💾 Simpan URL</button><button class="btn muted" onclick="syncNow()">☁️ Sinkronkan Sekarang</button></div>
+</div>
+<div class="card"><h2>Dashboard Atlet</h2><select id="dashAthlete" onchange="dashboard()"></select><div id="dash"></div></div>
+<div class="card"><h2>Ringkasan Atlet</h2><div class="tablewrap"><table><thead><tr><th>Atlet</th><th>Catatan</th><th>Hadir</th><th>Alpha</th><th>Status</th><th>Perubahan</th></tr></thead><tbody id="overview"></tbody></table></div></div>
+</section>
+
+<section id="monitor" class="hidden">
+<div class="card"><h2>Monitoring Latihan</h2><form id="monitorForm">
+<label>Atlet</label><select id="mAthlete" required></select>
+<div class="grid"><div><label>Minggu</label><select id="mWeek"></select></div><div><label>Tanggal</label><input id="mDate" type="date" required></div></div>
+<label>Status Kehadiran</label><select id="mAttendance"><option>Hadir</option><option>Izin</option><option>Sakit</option><option>Tanpa Keterangan</option></select>
+<label>Program</label><select id="mProgram"><option>Strength / Kekuatan</option><option>Speed / Kecepatan</option><option>Agility / Kelincahan</option><option>Teknik dengan Pelatih</option><option>Conditioning + Shadow</option><option>Recovery / Active Rest</option><option>Lainnya</option></select>
+<div class="grid"><div><label>Durasi (menit)</label><input id="mDuration" type="number" min="1" value="60"></div><div><label>Kondisi Sebelum</label><select id="mBefore"><option>Sangat Baik</option><option>Baik</option><option>Cukup</option><option>Kurang</option></select></div></div>
+<label>RPE (1–10)</label><div class="rpe" id="rpebox"></div>
+<div class="grid"><div><label>Kondisi Sesudah</label><select id="mAfter"><option>Baik</option><option>Lelah Ringan</option><option>Lelah</option><option>Sangat Lelah</option></select></div><div><label>Keluhan</label><select id="mComplaint"><option>Tidak ada</option><option>Nyeri ringan</option><option>Pegal berlebih</option><option>Pusing</option><option>Keluhan lain</option></select></div></div>
+<label>Catatan</label><textarea id="mNotes"></textarea><button class="btn primary">💾 Simpan Monitoring</button>
+</form></div></section>
+
+<section id="eval" class="hidden">
+<div class="card"><h2>Evaluasi 12 Indikator</h2><label>Atlet</label><select id="eAthlete" onchange="loadEval()"></select>
+<div class="grid"><div><label>Tahap</label><select id="eStage"><option value="M1">Minggu 1</option><option value="M4">Minggu 4</option><option value="M8">Minggu 8</option><option value="M12">Minggu 12</option></select></div><div><label>Catatan</label><input id="eNote"></div></div>
+<div id="scoreInputs"></div><button class="btn primary" onclick="saveEval()">💾 Simpan Evaluasi</button></div>
+<div class="card"><h2>Perkembangan Atlet</h2><div id="evalHistory"></div></div></section>
+
+<section id="test" class="hidden">
+<div class="card"><h2>Tes Fisik</h2><label>Atlet</label><select id="tAthlete"></select><div class="grid"><div><label>Tahap</label><select id="tStage"><option>M1</option><option>M4</option><option>M8</option><option>M12</option></select></div><div><label>Tanggal</label><input id="tDate" type="date"></div></div>
+<div class="scoregrid"><div><label>Speed (detik)</label><input id="speed" type="number" step=".01"></div><div><label>Power (cm)</label><input id="power" type="number" step=".1"></div><div><label>Agility (detik)</label><input id="agility" type="number" step=".01"></div><div><label>Stamina (menit/ronde)</label><input id="stamina" type="number" step=".1"></div><div><label>Reaction (detik)</label><input id="reaction" type="number" step=".01"></div></div>
+<p class="small">Hasil disimpan sebagai nilai mentah. Standar skor perlu disesuaikan dengan protokol tes dan kelompok atlet.</p><button class="btn primary" onclick="saveTest()">💾 Simpan Tes</button></div>
+<div class="card"><h2>Riwayat Tes</h2><div id="testHistory"></div></div></section>
+
+<section id="athlete" class="hidden"><div class="card"><h2>Data Atlet</h2><p class="small">Jumlah atlet tidak dibatasi 25. Ubah nama atlet dan keterangan, lalu simpan.</p><div id="athleteInputs"></div><div class="grid"><button class="btn muted" onclick="addAthlete()">➕ Tambah Atlet</button><button class="btn danger" onclick="removeLastAthlete()">➖ Hapus Atlet Terakhir</button></div><button class="btn primary" onclick="saveAthletes()">💾 Simpan Data Atlet</button></div></section>
+
+<section id="policy" class="hidden"><div class="card"><h2>⚖️ Aturan Kehadiran & Konsekuensi</h2><p class="small">“Tanpa Keterangan” dihitung sebagai alpha. Izin/sakit tidak dihitung sebagai alpha jika dicatat dengan benar.</p>
+<div class="item"><b>0–1 Alpha</b><br><span class="small">Status aman; tetap dipantau.</span></div><div class="item"><b>2 Alpha</b><br><span class="small">Peringatan I: teguran dan informasi kepada orang tua/wali.</span></div><div class="item"><b>3 Alpha</b><br><span class="small">Peringatan II: pembinaan khusus dan komunikasi dengan orang tua/wali.</span></div><div class="item"><b>4 Alpha</b><br><span class="small">Probation: tidak diprioritaskan untuk pertandingan sampai disiplin membaik.</span></div><div class="item"><b>5+ Alpha</b><br><span class="small">Rekomendasi pencoretan setelah pembinaan dan keputusan pelatih.</span></div>
+<p class="small">Keputusan akhir tetap mempertimbangkan alasan, kondisi siswa, dan komunikasi dengan orang tua/wali.</p></div></section>
+
+<section id="report" class="hidden"><div class="card"><h2>Laporan Atlet</h2><label>Atlet</label><select id="rAthlete" onchange="report()"></select><div id="reportBox"></div><button class="btn muted noprint" onclick="window.print()">🖨️ Cetak / Simpan PDF</button></div></section>
+</main>
+
+<script>
+const DEFAULT_API_URL='https://script.google.com/macros/s/AKfycbz9ABFiT1MqMWDy9KlFfkga7VBGY4lCDruEN68Sft3ShbCp1s5inBF4KHhvZJF3b_qV/exec';
+const K={ath:'silat_athletes_full',mon:'silat_monitor_full',ev:'silat_eval_full',test:'silat_test_full'};
+const defaults=Array.from({length:25},(_,i)=>`Atlet ${String(i+1).padStart(2,'0')}`);
+let athletes=readLocal(K.ath,null)||defaults;
+let athletesMeta=readLocal('silat_athletes_meta',[]);
+let mon=readLocal(K.mon,[]),ev=readLocal(K.ev,[]),tests=readLocal(K.test,[]);
+let API_URL=localStorage.getItem('silat_api_url')||DEFAULT_API_URL;
+const indicators=['Teknik','Footwork','Kecepatan','Power','Agility','Stamina','Reaction','Taktik','Sparring','Disiplin','Latihan Mandiri','Mental'];
+const $=id=>document.getElementById(id);
+function readLocal(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch(e){return fallback}}
+function persist(){localStorage.setItem(K.ath,JSON.stringify(athletes));localStorage.setItem('silat_athletes_meta',JSON.stringify(athletesMeta));localStorage.setItem(K.mon,JSON.stringify(mon));localStorage.setItem(K.ev,JSON.stringify(ev));localStorage.setItem(K.test,JSON.stringify(tests))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function setStatus(t,ok=false){const x=$('syncStatus');x.textContent=t;x.style.color=ok?'#86efac':'#cbd5e1'}
+function saveApiUrl(){API_URL=$('apiUrl').value.trim();localStorage.setItem('silat_api_url',API_URL);setStatus(API_URL?'URL database tersimpan':'Belum terhubung ke database');if(API_URL)syncNow()}
+function opts(id){const el=$(id),old=el.value;el.innerHTML='<option value="">Pilih atlet...</option>'+athletes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(athletes.includes(old))el.value=old}
+function consequence(a){if(a>=5)return{status:'Rekomendasi dicoret',action:'5+ alpha: evaluasi pelatih dan pembinaan.'};if(a===4)return{status:'Probation',action:'4 alpha: tidak diprioritaskan untuk pertandingan.'};if(a===3)return{status:'Peringatan II',action:'3 alpha: pembinaan khusus dan komunikasi dengan wali.'};if(a===2)return{status:'Peringatan I',action:'2 alpha: teguran dan informasi kepada wali.'};return{status:'Aman',action:'0–1 alpha: masih dalam batas aman.'}}
+function renderAthletes(){$('athleteInputs').innerHTML=athletes.map((n,i)=>`<div class="grid" style="margin-bottom:6px"><div><label>Atlet ${i+1}</label><input class="athName" data-i="${i}" value="${esc(n)}"></div><div><label>Kelas/Keterangan</label><input class="athInfo" data-i="${i}" value="${esc(athletesMeta[i]?.info||'')}"></div></div>`).join('')}
+function refreshSelects(){['dashAthlete','mAthlete','eAthlete','tAthlete','rAthlete'].forEach(opts)}
+function addAthlete(){athletes.push(`Atlet ${String(athletes.length+1).padStart(2,'0')}`);athletesMeta.push({info:''});renderAthletes();refreshSelects()}
+function removeLastAthlete(){if(athletes.length<=1)return alert('Minimal 1 atlet.');if(!confirm('Hapus atlet terakhir dari daftar? Catatan lama tidak otomatis dihapus.'))return;athletes.pop();athletesMeta.pop();renderAthletes();refreshSelects()}
+function init(){
+refreshSelects();$('mWeek').innerHTML=Array.from({length:12},(_,i)=>`<option>Minggu ${i+1}</option>`).join('');
+const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);$('mDate').value=localDate;$('tDate').value=localDate;
+$('rpebox').innerHTML=Array.from({length:10},(_,i)=>`<input id="rp${i+1}" name="rpe" type="radio" value="${i+1}"><label for="rp${i+1}">${i+1}</label>`).join('');
+renderAthletes();$('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1–5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1–5">`).join('');
+$('apiUrl').value=API_URL;dashboard();overview();setStatus(API_URL?'Siap sinkronisasi':'Belum terhubung ke database');}
+function page(p){['dashboard','monitor','eval','test','athlete','report','policy'].forEach(x=>$(x).classList.toggle('hidden',x!==p));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));const map={dashboard:'nDashboard',monitor:'nMonitor',eval:'nEval',test:'nTest',athlete:'nAthlete',report:'nReport',policy:'nPolicy'};if(map[p])$(map[p]).classList.add('active');if(p==='dashboard')dashboard();if(p==='eval')loadEval();if(p==='test')testHistory();if(p==='report')report()}
+function dashboard(){const n=$('dashAthlete').value;if(!n){$('dash').innerHTML='<p class="small">Pilih atlet.</p>';overview();return}const mm=mon.filter(x=>x.athlete===n),ee=ev.filter(x=>x.athlete===n);const alpha=mm.filter(x=>x.attendance==='Tanpa Keterangan').length,hadir=mm.filter(x=>x.attendance==='Hadir').length,latest=ee[ee.length-1],first=ee.find(x=>x.stage==='M1'),last=ee.find(x=>x.stage==='M12'),c=consequence(alpha);$('dash').innerHTML=`<div class="stats"><div class="stat"><b>${mm.length}</b><span>Catatan</span></div><div class="stat"><b>${hadir}</b><span>Hadir</span></div><div class="stat"><b>${alpha}</b><span>Alpha</span></div></div><div class="item"><b>Status disiplin</b><br><span class="badge ${alpha>=4?'bad':alpha>=2?'warn':'good'}">${c.status}</span><br><span class="small">${c.action}</span></div><div class="item"><b>Evaluasi terakhir</b><br><span class="small">${latest?latest.stage+' • rata-rata '+Number(latest.avg).toFixed(2):'Belum ada evaluasi'}</span></div><div class="item"><b>Perkembangan M1 → M12</b><br><span class="small">${first&&last?((last.avg-first.avg)>=0?'+':'')+(last.avg-first.avg).toFixed(2):'Belum lengkap'}</span></div>`;overview()}
+function overview(){$('overview').innerHTML=athletes.map(n=>{const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),h=m.filter(x=>x.attendance==='Hadir').length,a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);return `<tr><td>${esc(n)}</td><td>${m.length}</td><td>${h}</td><td>${a}</td><td><span class="badge ${a>=4?'bad':a>=2?'warn':'good'}">${c.status}</span></td><td>${f&&l?(l.avg-f.avg).toFixed(2):'-'}</td></tr>`}).join('')}
+$('monitorForm').onsubmit=async e=>{e.preventDefault();const rp=document.querySelector('input[name="rpe"]:checked');if(!$('mAthlete').value||!rp)return alert('Pilih atlet dan RPE.');const row={id:String(Date.now()),athlete:$('mAthlete').value,week:$('mWeek').value,date:$('mDate').value,attendance:$('mAttendance').value,program:$('mProgram').value,duration:+$('mDuration').value,rpe:+rp.value,before:$('mBefore').value,after:$('mAfter').value,complaint:$('mComplaint').value,notes:$('mNotes').value};mon.push(row);persist();const saved=API_URL?await api('saveMonitoring',{row}):null;alert(saved?'Monitoring tersimpan di perangkat dan server.':'Monitoring tersimpan di perangkat. Sinkronkan saat koneksi tersedia.');$('mNotes').value='';document.querySelectorAll('input[name="rpe"]').forEach(x=>x.checked=false);dashboard()};
+function loadEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return;const old=ev.find(x=>x.athlete===n&&x.stage===s);document.querySelectorAll('.score').forEach(x=>x.value=old?(old.scores?.[x.dataset.ind]??''):'');$('eNote').value=old?.note||'';evalHistory()}
+$('eStage').onchange=loadEval;
+async function saveEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return alert('Pilih atlet.');const scores={};document.querySelectorAll('.score').forEach(x=>{if(x.value)scores[x.dataset.ind]=+x.value});if(Object.keys(scores).length!==12)return alert('Isi semua 12 indikator.');ev=ev.filter(x=>!(x.athlete===n&&x.stage===s));const avg=Object.values(scores).reduce((a,b)=>a+b,0)/12,row={id:String(Date.now()),athlete:n,stage:s,scores,avg,note:$('eNote').value};ev.push(row);persist();const saved=API_URL?await api('saveEvaluation',{row}):null;alert(saved?'Evaluasi tersimpan di perangkat dan server.':'Evaluasi tersimpan di perangkat. Sinkronkan saat online.');evalHistory();overview()}
+function cat(a){return a>=4.5?'Sangat Baik':a>=3.5?'Baik':a>=2.5?'Cukup':a>=1.5?'Kurang':'Sangat Kurang'}
+function evalHistory(){const n=$('eAthlete').value;if(!n){$('evalHistory').innerHTML='';return}const rows=ev.filter(x=>x.athlete===n);$('evalHistory').innerHTML=`<div class="tablewrap"><table><tr><th>Tahap</th><th>Rata-rata</th><th>Kategori</th><th>Catatan</th></tr>${rows.map(x=>`<tr><td>${esc(x.stage)}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td><td>${esc(x.note||'-')}</td></tr>`).join('')}</table></div>`}
+async function saveTest(){const n=$('tAthlete').value;if(!n)return alert('Pilih atlet.');const row={id:String(Date.now()),athlete:n,stage:$('tStage').value,date:$('tDate').value,speed:$('speed').value,power:$('power').value,agility:$('agility').value,stamina:$('stamina').value,reaction:$('reaction').value};tests.push(row);persist();const saved=API_URL?await api('saveTest',{row}):null;alert(saved?'Tes tersimpan di perangkat dan server.':'Tes tersimpan di perangkat. Sinkronkan saat online.');testHistory()}
+function testHistory(){const n=$('tAthlete').value;if(!n){$('testHistory').innerHTML='<p class="small">Pilih atlet untuk melihat riwayat.</p>';return}const rows=tests.filter(x=>x.athlete===n);$('testHistory').innerHTML=rows.length?`<div class="tablewrap"><table><tr><th>Tahap</th><th>Tanggal</th><th>Speed</th><th>Power</th><th>Agility</th><th>Stamina</th><th>Reaction</th></tr>${rows.map(x=>`<tr><td>${esc(x.stage)}</td><td>${esc(x.date||'-')}</td><td>${esc(x.speed||'-')}</td><td>${esc(x.power||'-')}</td><td>${esc(x.agility||'-')}</td><td>${esc(x.stamina||'-')}</td><td>${esc(x.reaction||'-')}</td></tr>`).join('')}</table></div>`:'<p class="small">Belum ada tes.</p>'}
+$('tAthlete').onchange=testHistory;
+async function saveAthletes(){const old=athletes.slice(),newA=[...document.querySelectorAll('.athName')].map((x,i)=>x.value.trim()||`Atlet ${i+1}`),meta=[...document.querySelectorAll('.athInfo')].map(x=>({info:x.value.trim()}));athletes=newA;athletesMeta=meta;persist();refreshSelects();renderAthletes();const payload={athletes:athletes.map((name,i)=>({name,info:meta[i]?.info||'',oldName:old[i]||''}))};const saved=API_URL?await api('saveAthletes',payload):null;alert(saved?'Data atlet tersimpan di perangkat dan server.':'Data atlet tersimpan di perangkat. Sinkronkan saat online.');dashboard()}
+function report(){const n=$('rAthlete').value;if(!n){$('reportBox').innerHTML='';return}const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);$('reportBox').innerHTML=`<h3>${esc(n)}</h3><div class="stats"><div class="stat"><b>${m.length}</b><span>Catatan</span></div><div class="stat"><b>${m.filter(x=>x.attendance==='Hadir').length}</b><span>Hadir</span></div><div class="stat"><b>${a}</b><span>Alpha</span></div></div><p><b>Status disiplin:</b> ${c.status} — ${c.action}</p><h4>Evaluasi</h4><div class="tablewrap"><table><tr><th>Tahap</th><th>Nilai</th><th>Kategori</th></tr>${e.map(x=>`<tr><td>${esc(x.stage)}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td></tr>`).join('')}</table></div><p><b>Perubahan M1→M12:</b> ${f&&l?(l.avg-f.avg).toFixed(2):'Belum lengkap'}</p><h4>Monitoring terakhir</h4>${m.slice(-5).reverse().map(x=>`<div class="item">${esc(x.date)} • ${esc(x.program)} • RPE ${esc(x.rpe)}<br><span class="badge">${esc(x.attendance||'Hadir')}</span><br><span class="small">${esc(x.notes||'-')}</span></div>`).join('')}`}
+async function api(action,data={}){if(!API_URL){setStatus('Belum terhubung ke database');return null}try{setStatus('Mengirim data...');const body=new URLSearchParams();body.set('action',action);body.set('payload',JSON.stringify(data));const r=await fetch(API_URL,{method:'POST',body});const j=await r.json();if(!j.ok)throw new Error(j.error||'Server error');setStatus('Data terkirim • '+new Date().toLocaleTimeString('id-ID'),true);return j}catch(err){setStatus('Tersimpan lokal • Server belum mengonfirmasi');return null}}
+function apiGet(action){return new Promise(resolve=>{if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}const callbackName='silatCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);const script=document.createElement('script');let selesai=false;let timer;function cleanup(){if(selesai)return;selesai=true;clearTimeout(timer);script.remove();delete window[callbackName]}timer=setTimeout(()=>{cleanup();setStatus('Offline/cache • Waktu koneksi habis');resolve(null)},20000);window[callbackName]=result=>{cleanup();if(!result||!result.ok){setStatus('Gagal membaca database');resolve(null);return}setStatus('Data berhasil dibaca • '+new Date().toLocaleTimeString('id-ID'),true);resolve(result)};script.onerror=()=>{cleanup();setStatus('Offline/cache • Gagal memuat respons API');resolve(null)};const separator=API_URL.includes('?')?'&':'?';script.src=API_URL+separator+'action='+encodeURIComponent(action)+'&callback='+encodeURIComponent(callbackName)+'&t='+Date.now();document.body.appendChild(script)})}
+async function syncNow(){if(!API_URL){alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');return}const result=await apiGet('bootstrap');if(!result)return;const d=result.data||{};const hasServer=(Array.isArray(d.athletes)&&d.athletes.length>0)||(d.monitoring||[]).length||(d.evaluations||[]).length||(d.tests||[]).length;if(!hasServer){const upload=await api('saveAll',{athletes:athletes.map((name,i)=>({name,info:athletesMeta[i]?.info||'',oldName:''})),monitoring:mon,evaluations:ev,tests});if(upload){setStatus('Data lokal berhasil diunggah',true);return}setStatus('Database terbaca kosong; pengiriman perlu diperiksa');alert('Database berhasil dibaca tetapi masih kosong. Data lokal belum dapat dipastikan terkirim. Coba lagi saat online.');return}if(!confirm('Database berisi data. Muat data server ke perangkat ini? Data lokal yang belum tersinkron dapat tertimpa.'))return;athletes=(d.athletes||[]).map(x=>x.name);athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));mon=d.monitoring||[];ev=(d.evaluations||[]).map(x=>({...x,scores:typeof x.scores==='string'?safeJson(x.scores,{}):x.scores||{}}));tests=d.tests||[];persist();refreshSelects();renderAthletes();dashboard();overview();loadEval();testHistory();report();setStatus('Sinkronisasi selesai • '+new Date().toLocaleTimeString('id-ID'),true)}
+function safeJson(s,f){try{return JSON.parse(s)}catch(e){return f}}
+init();
+</script>
+</body>
+</html>
