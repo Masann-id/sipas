@@ -239,53 +239,293 @@ table td,table th{border-color:var(--line)!important}
 </main>
 
 <script>
-/* ===== SIPAS BACKEND BRIDGE — kompatibel dengan Apps Script SIPAS ===== */
-const SIPAS_API_URL='https://script.google.com/macros/s/AKfycbyINt4DQVwbxcPbCVm4gCis9RHUeF2r3_0vqvtXDYw0q_BmnSd31kiYT26hcKOkZWzvww/exec';
-API_URL=localStorage.getItem('silat_api_url')||SIPAS_API_URL;
-$('apiUrl').value=API_URL;
-
-function normalizeServerData(d){
-  d=d||{};
-  const rawAth=Array.isArray(d.athletes)?d.athletes:[];
-  const byId={}; rawAth.forEach(a=>byId[String(a.id)]=a);
-  athletes=rawAth.map(a=>a.name).filter(Boolean);
-  athletesMeta=rawAth.map(a=>({info:[a.gender,a.age_group,a.school_class].filter(Boolean).join(' • ')}));
-  mon=(d.monitoring||[]).map(x=>{const a=byId[String(x.athlete_id)]||{};return {id:x.id,athlete:a.name||x.athlete_id||'',date:x.date||'',attendance:'Hadir',program:x.training_program||'',duration:Number(x.duration_minute||60),rpe:Number(x.rpe||0),before:x.condition_before||'',after:x.condition_after||'',pulse_before:Number(x.pulse_before_15s||0),pulse_after:Number(x.pulse_after_15s||0),pulse_before_bpm:x.pulse_before_bpm||'',pulse_after_bpm:x.pulse_after_bpm||'',pulse_change:x.pulse_change_bpm||'',complaint:x.complaint||'',notes:x.notes||''};});
-  ev=(d.evaluations||[]).map(x=>{const a=byId[String(x.athlete_id)]||{};const scores={Teknik:x.technique,Footwork:x.footwork,Kecepatan:x.speed,Power:x.power,Agility:x.agility,Stamina:x.stamina,Reaction:x.reaction,Taktik:x.tactics,Sparring:x.sparring,Disiplin:x.discipline,'Latihan Mandiri':x.independent_training,Mental:x.mental};return {id:x.id,athlete:a.name||x.athlete_id||'',stage:x.stage||'',scores,avg:Number(x.average||0),note:x.notes||''};});
-  tests=(d.physical_tests||[]).map(x=>{const a=byId[String(x.athlete_id)]||{};return {id:x.id,athlete:a.name||x.athlete_id||'',stage:x.stage||'',date:x.date||'',speed:x.speed_seconds||'',power:x.power_cm||'',agility:x.agility_seconds||'',stamina:x.stamina_value||'',reaction:x.reaction_seconds||''};});
-  persist(); renderAll();
+const DEFAULT_API_URL='https://script.google.com/macros/s/AKfycbyINt4DQVwbxcPbCVm4gCis9RHUeF2r3_0vqvtXDYw0q_BmnSd31kiYT26hcKOkZWzvww/exec';
+const K={ath:'silat_athletes_full',mon:'silat_monitor_full',ev:'silat_eval_full',test:'silat_test_full'};
+const defaults=Array.from({length:25},(_,i)=>`Atlet ${String(i+1).padStart(2,'0')}`);
+let athletes=readLocal(K.ath,null)||defaults;
+let athletesMeta=readLocal('silat_athletes_meta',[]);
+let mon=readLocal(K.mon,[]),ev=readLocal(K.ev,[]),tests=readLocal(K.test,[]);
+let API_URL=localStorage.getItem('silat_api_url')||DEFAULT_API_URL;
+const indicators=['Teknik','Footwork','Kecepatan','Power','Agility','Stamina','Reaction','Taktik','Sparring','Disiplin','Latihan Mandiri','Mental'];
+const $=id=>document.getElementById(id);
+function readLocal(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch(e){return fallback}}
+function persist(){localStorage.setItem(K.ath,JSON.stringify(athletes));localStorage.setItem('silat_athletes_meta',JSON.stringify(athletesMeta));localStorage.setItem(K.mon,JSON.stringify(mon));localStorage.setItem(K.ev,JSON.stringify(ev));localStorage.setItem(K.test,JSON.stringify(tests))}
+function hasRealLocalData(){
+  const defaultOnly=athletes.length===25 && athletes.every((x,i)=>x===`Atlet ${String(i+1).padStart(2,'0')}`);
+  return !defaultOnly || mon.length>0 || ev.length>0 || tests.length>0;
 }
-function applyServerData(d){normalizeServerData(d)}
+function applyServerData(d){
+  athletes=(d.athletes||[]).map(x=>x.name).filter(Boolean);
+  athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));
+  mon=d.monitoring||[];
+  ev=d.evaluations||[];
+  tests=d.tests||[];
+  persist();
+  renderAll();
+}
 
-function apiGet(action,extra={}){return new Promise(resolve=>{if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}const cb='sipasCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);const s=document.createElement('script');let done=false;let timer;const cleanup=()=>{if(done)return;done=true;clearTimeout(timer);s.remove();try{delete window[cb]}catch(e){}};window[cb]=r=>{cleanup();if(!r||r.ok===false){setStatus(r?.message||'Gagal membaca database');resolve(r||null);return}setStatus('Database terhubung • '+new Date().toLocaleTimeString('id-ID'),true);resolve(r)};s.onerror=()=>{cleanup();setStatus('Gagal memuat respons API');resolve(null)};timer=setTimeout(()=>{cleanup();setStatus('Koneksi habis');resolve(null)},20000);const q=Object.assign({},extra,{action,callback:cb,t:Date.now()});s.src=API_URL+'?'+new URLSearchParams(q).toString();document.body.appendChild(s)})}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function setStatus(t,ok=false){const x=$('syncStatus');x.textContent=t;x.style.color=ok?'#86efac':'#cbd5e1'}
+function saveApiUrl(){API_URL=$('apiUrl').value.trim();localStorage.setItem('silat_api_url',API_URL);setStatus(API_URL?'URL database tersimpan':'Belum terhubung ke database');if(API_URL)syncNow()}
+function opts(id){const el=$(id),old=el.value;el.innerHTML='<option value="">Pilih atlet...</option>'+athletes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(athletes.includes(old))el.value=old}
+function consequence(a){if(a>=5)return{status:'Rekomendasi dicoret',action:'5+ alpha: evaluasi pelatih dan pembinaan.'};if(a===4)return{status:'Probation',action:'4 alpha: tidak diprioritaskan untuk pertandingan.'};if(a===3)return{status:'Peringatan II',action:'3 alpha: pembinaan khusus dan komunikasi dengan wali.'};if(a===2)return{status:'Peringatan I',action:'2 alpha: teguran dan informasi kepada wali.'};return{status:'Aman',action:'0–1 alpha: masih dalam batas aman.'}}
+function renderAthletes(){$('athleteInputs').innerHTML=athletes.map((n,i)=>`<div class="grid" style="margin-bottom:6px"><div><label>Atlet ${i+1}</label><input class="athName" data-i="${i}" value="${esc(n)}"></div><div><label>Kelas/Keterangan</label><input class="athInfo" data-i="${i}" value="${esc(athletesMeta[i]?.info||'')}"></div></div>`).join('')}
+function refreshSelects(){['dashAthlete','mAthlete','eAthlete','tAthlete','rAthlete'].forEach(opts)}
+function addAthlete(){athletes.push(`Atlet ${String(athletes.length+1).padStart(2,'0')}`);athletesMeta.push({info:''});renderAthletes();refreshSelects()}
+function removeLastAthlete(){if(athletes.length<=1)return alert('Minimal 1 atlet.');if(!confirm('Hapus atlet terakhir dari daftar? Catatan lama tidak otomatis dihapus.'))return;athletes.pop();athletesMeta.pop();renderAthletes();refreshSelects()}
+function init(){refreshSelects();$('mWeek').innerHTML=Array.from({length:12},(_,i)=>`<option>Minggu ${i+1}</option>`).join('');const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);$('mDate').value=localDate;$('tDate').value=localDate;$('rpebox').innerHTML=Array.from({length:10},(_,i)=>`<input id="rp${i+1}" name="rpe" type="radio" value="${i+1}"><label for="rp${i+1}">${i+1}</label>`).join('');renderAthletes();$('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1–5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1–5">`).join('');$('apiUrl').value=API_URL;initAttendance();bindPulseInputs();setStatus(API_URL?'Silakan login':'Belum terhubung ke database');if(window.SIPAS_AUTH){hideLogin();applyRoleUI();if(window.SIPAS_AUTH.user?.role==='superadmin'){showSuperAdmin();}else{apiGet('bootstrap',{token:window.SIPAS_AUTH.token}).then(b=>{if(b?.ok){applyServerData(b.data||b);dashboard();overview()}else{localStorage.removeItem('sipas_server_auth');window.SIPAS_AUTH=null;showLogin()}})}}else showLogin()}
+function page(p){['dashboard','monitor','attendance','eval','test','athlete','report','policy'].forEach(x=>$(x).classList.toggle('hidden',x!==p));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));const map={dashboard:'nDashboard',monitor:'nMonitor',attendance:'nAttendance',eval:'nEval',test:'nTest',athlete:'nAthlete',report:'nReport',policy:'nPolicy'};if(map[p])$(map[p]).classList.add('active');if(p==='dashboard')dashboard();if(p==='eval')loadEval();if(p==='test')testHistory();if(p==='report')report()}
+function dashboard(){
+  const total=athletes.length;
+  const totalMon=mon.length;
+  const hadir=mon.filter(x=>x.attendance==='Hadir').length;
+  const evalCount=ev.length;
+  const latestVals=ev.slice(-total).map(x=>Number(x.avg)).filter(Number.isFinite);
+  const avg=latestVals.length?(latestVals.reduce((a,b)=>a+b,0)/latestVals.length).toFixed(2):'—';
+  $('kpiAthletes').textContent=total;
+  $('kpiAttendance').textContent=totalMon?Math.round(hadir/totalMon*100)+'%':'0%';
+  $('kpiEval').textContent=evalCount;
+  $('kpiAvg').textContent=avg;
+  $('dashSystemStatus').textContent=API_URL?'Database terhubung melalui URL yang tersimpan.':'Mode lokal aktif — database server belum disinkronkan.';
+  const n=$('dashAthlete').value;
+  if(!n){$('dash').innerHTML='<div class="dash-empty">Belum ada atlet yang dipilih. Pilih nama atlet untuk melihat perkembangan.</div>';overview();return}
+  const mm=mon.filter(x=>x.athlete===n),ee=ev.filter(x=>x.athlete===n);
+  const alpha=mm.filter(x=>x.attendance==='Tanpa Keterangan').length;
+  const hadirN=mm.filter(x=>x.attendance==='Hadir').length;
+  const latest=ee[ee.length-1],first=ee.find(x=>x.stage==='M1'),last=ee.find(x=>x.stage==='M12'),c=consequence(alpha);
+  const change=first&&last?((last.avg-first.avg)>=0?'+':'')+(last.avg-first.avg).toFixed(2):'—';
+  $('dash').innerHTML=`<div class="dash-detail-grid">
+    <div class="dash-mini"><span class="mini-label">Monitoring</span><b>${mm.length}</b></div>
+    <div class="dash-mini"><span class="mini-label">Hadir</span><b>${hadirN}</b></div>
+    <div class="dash-mini"><span class="mini-label">Evaluasi</span><b>${ee.length}</b></div>
+  </div>
+  <div class="dash-status"><b>Status disiplin</b><br><span class="badge ${alpha>=4?'bad':alpha>=2?'warn':'good'}">${c.status}</span><br><span class="small">${c.action}</span></div>
+  <div class="dash-detail-grid" style="margin-top:10px">
+    <div class="dash-mini"><span class="mini-label">Evaluasi terakhir</span><b>${latest?Number(latest.avg).toFixed(2):'—'}</b></div>
+    <div class="dash-mini"><span class="mini-label">Kategori</span><b style="font-size:15px;margin-top:8px">${latest?cat(Number(latest.avg)):'—'}</b></div>
+    <div class="dash-mini"><span class="mini-label">M1 → M12</span><b>${change}</b></div>
+  </div>`;
+  overview();
+}
+function overview(){$('overview').innerHTML=athletes.map(n=>{const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),h=m.filter(x=>x.attendance==='Hadir').length,a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);return `<tr><td>${esc(n)}</td><td>${m.length}</td><td>${h}</td><td>${a}</td><td><span class="badge ${a>=4?'bad':a>=2?'warn':'good'}">${c.status}</span></td><td>${f&&l?(l.avg-f.avg).toFixed(2):'-'}</td></tr>`}).join('')}
+$('monitorForm').onsubmit=async e=>{e.preventDefault();const rp=document.querySelector('input[name="rpe"]:checked');const programs=[...document.querySelectorAll('input[name="mProgram"]:checked')].map(x=>x.value);if(!$('mAthlete').value||!rp)return alert('Pilih atlet dan RPE.');if(!programs.length)return alert('Pilih minimal satu program latihan.');const pb=Number($('mPulseBefore').value||0),pa=Number($('mPulseAfter').value||0);const row={id:String(Date.now()),athlete:$('mAthlete').value,week:$('mWeek').value,date:$('mDate').value,attendance:$('mAttendance').value,program:programs.join(' + '),programs, duration:+$('mDuration').value,rpe:+rp.value,before:$('mBefore').value,after:$('mAfter').value,pulse_before:pb||'',pulse_after:pa||'',pulse_before_bpm:pb?pb*4:'',pulse_after_bpm:pa?pa*4:'',pulse_change:(pb&&pa)?(pa-pb)*4:'',complaint:$('mComplaint').value,notes:$('mNotes').value};mon.push(row);persist();const saved=API_URL?await api('saveMonitoring',{row}):null;alert(saved?'Monitoring tersimpan di perangkat dan server.':'Monitoring tersimpan di perangkat. Sinkronkan saat koneksi tersedia.');$('mNotes').value='';document.querySelectorAll('input[name="rpe"]').forEach(x=>x.checked=false);document.querySelectorAll('input[name="mProgram"]').forEach(x=>x.checked=false);$('mPulseBefore').value='';$('mPulseAfter').value='';updatePulseUI();dashboard()};
+function loadEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return;const old=ev.find(x=>x.athlete===n&&x.stage===s);document.querySelectorAll('.score').forEach(x=>x.value=old?(old.scores?.[x.dataset.ind]??''):'');$('eNote').value=old?.note||'';evalHistory()}
+$('eStage').onchange=loadEval;
+function initAttendance(){const d=new Date();const localDate=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);$('aDate').value=localDate;renderAttendanceList();$('aDate').onchange=renderAttendanceList;$('aGroup').onchange=renderAttendanceList}
+function renderAttendanceList(){const box=$('attendanceList');if(!box)return;box.innerHTML=athletes.map((n,i)=>`<div class="attendance-row" data-athlete="${esc(n)}"><div><b>${esc(n)}</b><span class="small">Atlet ${i+1}</span></div><select class="aStatus"><option>Hadir</option><option>Izin</option><option>Sakit</option><option>Alpa</option></select></div>`).join('');box.querySelectorAll('.aStatus').forEach(x=>x.onchange=updateAttendanceSummary);updateAttendanceSummary()}
+function updateAttendanceSummary(){const st=[...document.querySelectorAll('.aStatus')].map(x=>x.value);const c=v=>st.filter(x=>x===v).length;$('aSummary').textContent=`${c('Hadir')} hadir • ${c('Izin')} izin • ${c('Sakit')} sakit • ${c('Alpa')} alpa`}
+async function saveBulkAttendance(){const date=$('aDate').value,group=$('aGroup').value;if(!date)return alert('Pilih tanggal.');const rows=[...document.querySelectorAll('.attendance-row')].map(r=>({id:String(Date.now())+'_'+Math.random().toString(36).slice(2,7),athlete:r.dataset.athlete,group,date,status:r.querySelector('.aStatus').value}));const localKey='sipas_student_attendance';const old=readLocal(localKey,[]);const merged=old.filter(x=>!(x.date===date&&x.group===group));localStorage.setItem(localKey,JSON.stringify(merged.concat(rows)));if(API_URL)await api('saveBulkAttendance',{rows});alert('Absensi kelompok tersimpan. '+rows.filter(x=>x.status==='Hadir').length+' atlet hadir.');dashboard()}
+let coachStream=null,coachPhotoData='';
+async function startCoachCamera(){try{coachStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});$('coachVideo').srcObject=coachStream;$('coachVideo').classList.remove('hidden');$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.add('hidden')}catch(e){alert('Kamera tidak dapat dibuka. Pastikan izin kamera diberikan dan halaman dibuka melalui HTTPS.')}}
+function takeCoachPhoto(){const v=$('coachVideo'),c=$('coachCanvas');if(!v.srcObject||!v.videoWidth)return alert('Buka kamera terlebih dahulu.');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0,c.width,c.height);coachPhotoData=c.toDataURL('image/jpeg',0.72);$('coachPhotoPreview').src=coachPhotoData;$('coachPhotoPreview').classList.remove('hidden');$('coachVideo').classList.add('hidden');$('coachAttendanceStatus').className='pulse-status good';$('coachAttendanceStatus').textContent='Foto berhasil diambil. Selanjutnya cek GPS.';if(coachStream){coachStream.getTracks().forEach(t=>t.stop());coachStream=null}}
+let coachGps={lat:null,lng:null,accuracy:null};
+function checkCoachGPS(){if(!navigator.geolocation)return alert('Perangkat tidak mendukung GPS.');$('gpsStatus').textContent='Mencari lokasi...';navigator.geolocation.getCurrentPosition(p=>{coachGps={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy};$('gpsStatus').textContent=`${coachGps.lat.toFixed(6)}, ${coachGps.lng.toFixed(6)} • akurasi ±${Math.round(coachGps.accuracy)} m`;$('coachAttendanceStatus').className='pulse-status neutral';$('coachAttendanceStatus').textContent=coachPhotoData?'GPS siap + foto siap. Tekan Hadirkan Pelatih.':'GPS siap. Ambil foto selfie.'},e=>{$('gpsStatus').textContent='GPS gagal: '+e.message}, {enableHighAccuracy:true,timeout:15000,maximumAge:0})}
+async function saveCoachAttendance(){if(!coachPhotoData)return alert('Ambil foto/selfie terlebih dahulu.');if(coachGps.lat===null)return alert('Cek lokasi GPS terlebih dahulu.');const row={id:String(Date.now()),coach:window.SIPAS_AUTH?.user?.name||'Pelatih',group:$('coachGroup').value,location_name:$('coachLocation').value.trim()||'Lokasi Latihan',lat:coachGps.lat,lng:coachGps.lng,accuracy:coachGps.accuracy,photo_taken:true,photo_verification:'SELFIE_CAPTURED',status:'HADIR'};const local=readLocal('sipas_coach_attendance',[]);local.push({...row,date:new Date().toISOString().slice(0,10),time:new Date().toLocaleTimeString('id-ID'),photo_data:coachPhotoData});localStorage.setItem('sipas_coach_attendance',JSON.stringify(local));let saved=null;if(API_URL)saved=await api('saveCoachAttendance',{row});alert(saved?'Absensi pelatih tersimpan dan dikirim ke server.':'Absensi pelatih tersimpan di perangkat. Sinkronkan saat koneksi tersedia.');coachPhotoData='';coachGps={lat:null,lng:null,accuracy:null};$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.remove('hidden');$('gpsStatus').textContent='Belum dicek';$('coachAttendanceStatus').className='pulse-status neutral';$('coachAttendanceStatus').textContent='Absensi berikutnya membutuhkan GPS dan foto.'}
+function bindPulseInputs(){['mPulseBefore','mPulseAfter'].forEach(id=>$(id).addEventListener('input',updatePulseUI));updatePulseUI()}
+function updatePulseUI(){const b=Number($('mPulseBefore')?.value||0),a=Number($('mPulseAfter')?.value||0);if($('mPulseBeforeBpm'))$('mPulseBeforeBpm').textContent=b?`${b*4} BPM`:'— BPM';if($('mPulseAfterBpm'))$('mPulseAfterBpm').textContent=a?`${a*4} BPM`:'— BPM';const el=$('pulseStatus');if(!el)return;if(!b||!a){el.className='pulse-status neutral';el.textContent='Masukkan kedua hitungan nadi untuk melihat perubahan.';return}const diff=(a-b)*4;if(diff<0){el.className='pulse-status good';el.textContent=`Recovery baik • ${Math.abs(diff)} BPM lebih rendah setelah latihan.`}else if(diff<=20){el.className='pulse-status good';el.textContent=`Perubahan +${diff} BPM • dalam pemantauan normal.`}else if(diff<=40){el.className='pulse-status warn';el.textContent=`Perubahan +${diff} BPM • perlu dipantau.`}else if(diff<=60){el.className='pulse-status orange';el.textContent=`Perubahan +${diff} BPM • pantau kondisi atlet.`}else{el.className='pulse-status bad';el.textContent=`Perubahan +${diff} BPM • perhatian lebih diperlukan.`}}
+async function saveEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return alert('Pilih atlet.');const scores={};document.querySelectorAll('.score').forEach(x=>{if(x.value)scores[x.dataset.ind]=+x.value});if(Object.keys(scores).length!==12)return alert('Isi semua 12 indikator.');ev=ev.filter(x=>!(x.athlete===n&&x.stage===s));const avg=Object.values(scores).reduce((a,b)=>a+b,0)/12,row={id:String(Date.now()),athlete:n,stage:s,scores,avg,note:$('eNote').value};ev.push(row);persist();const saved=API_URL?await api('saveEvaluation',{row}):null;alert(saved?'Evaluasi tersimpan di perangkat dan server.':'Evaluasi tersimpan di perangkat. Sinkronkan saat online.');evalHistory();overview()}
+function cat(a){return a>=4.5?'Sangat Baik':a>=3.5?'Baik':a>=2.5?'Cukup':a>=1.5?'Kurang':'Sangat Kurang'}
+function evalHistory(){const n=$('eAthlete').value;if(!n){$('evalHistory').innerHTML='';return}const rows=ev.filter(x=>x.athlete===n);$('evalHistory').innerHTML=`<div class="tablewrap"><table><tr><th>Tahap</th><th>Rata-rata</th><th>Kategori</th><th>Catatan</th></tr>${rows.map(x=>`<tr><td>${esc(x.stage)}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td><td>${esc(x.note||'-')}</td></tr>`).join('')}</table></div>`}
+async function saveTest(){const n=$('tAthlete').value;if(!n)return alert('Pilih atlet.');const row={id:String(Date.now()),athlete:n,stage:$('tStage').value,date:$('tDate').value,speed:$('speed').value,power:$('power').value,agility:$('agility').value,stamina:$('stamina').value,reaction:$('reaction').value};tests.push(row);persist();const saved=API_URL?await api('saveTest',{row}):null;alert(saved?'Tes tersimpan di perangkat dan server.':'Tes tersimpan di perangkat. Sinkronkan saat online.');testHistory()}
+function testHistory(){const n=$('tAthlete').value;if(!n){$('testHistory').innerHTML='<p class="small">Pilih atlet untuk melihat riwayat.</p>';return}const rows=tests.filter(x=>x.athlete===n);$('testHistory').innerHTML=rows.length?`<div class="tablewrap"><table><tr><th>Tahap</th><th>Tanggal</th><th>Speed</th><th>Power</th><th>Agility</th><th>Stamina</th><th>Reaction</th></tr>${rows.map(x=>`<tr><td>${esc(x.stage)}</td><td>${esc(x.date||'-')}</td><td>${esc(x.speed||'-')}</td><td>${esc(x.power||'-')}</td><td>${esc(x.agility||'-')}</td><td>${esc(x.stamina||'-')}</td><td>${esc(x.reaction||'-')}</td></tr>`).join('')}</table></div>`:'<p class="small">Belum ada tes.</p>'}
+$('tAthlete').onchange=testHistory;
+async function saveAthletes(){const old=athletes.slice(),newA=[...document.querySelectorAll('.athName')].map((x,i)=>x.value.trim()||`Atlet ${i+1}`),meta=[...document.querySelectorAll('.athInfo')].map(x=>({info:x.value.trim()}));athletes=newA;athletesMeta=meta;persist();refreshSelects();renderAthletes();const payload={athletes:athletes.map((name,i)=>({name,info:meta[i]?.info||'',oldName:old[i]||''}))};const saved=API_URL?await api('saveAthletes',payload):null;alert(saved?'Data atlet tersimpan di perangkat dan server.':'Data atlet tersimpan di perangkat. Sinkronkan saat online.');dashboard()}
+function report(){const n=$('rAthlete').value;if(!n){$('reportBox').innerHTML='';return}const m=mon.filter(x=>x.athlete===n),e=ev.filter(x=>x.athlete===n),f=e.find(x=>x.stage==='M1'),l=e.find(x=>x.stage==='M12'),a=m.filter(x=>x.attendance==='Tanpa Keterangan').length,c=consequence(a);$('reportBox').innerHTML=`<h3>${esc(n)}</h3><div class="stats"><div class="stat"><b>${m.length}</b><span>Catatan</span></div><div class="stat"><b>${m.filter(x=>x.attendance==='Hadir').length}</b><span>Hadir</span></div><div class="stat"><b>${a}</b><span>Alpha</span></div></div><p><b>Status disiplin:</b> ${c.status} — ${c.action}</p><h4>Evaluasi</h4><div class="tablewrap"><table><tr><th>Tahap</th><th>Nilai</th><th>Kategori</th></tr>${e.map(x=>`<tr><td>${esc(x.stage)}</td><td>${Number(x.avg).toFixed(2)}</td><td>${cat(Number(x.avg))}</td></tr>`).join('')}</table></div><p><b>Perubahan M1→M12:</b> ${f&&l?(l.avg-f.avg).toFixed(2):'Belum lengkap'}</p><h4>Monitoring terakhir</h4>${m.slice(-5).reverse().map(x=>`<div class="item">${esc(x.date)} • ${esc(x.program)} • RPE ${esc(x.rpe)}<br><span class="badge">${esc(x.attendance||'Hadir')}</span><br><span class="small">${esc(x.notes||'-')}</span></div>`).join('')}`}
+function api(action,data={}){
+  return new Promise(function(resolve){
+    if(!API_URL){
+      setStatus('Belum terhubung ke database');
+      resolve(null);
+      return;
+    }
 
-function api(action,data={}){return new Promise(resolve=>{if(!API_URL){resolve(null);return}setStatus('Mengirim data ke database...');let body=Object.assign({},data);if(body.row&&typeof body.row==='object'){body=Object.assign({},body.row)}if(window.SIPAS_AUTH?.token)body.token=window.SIPAS_AUTH.token;const frame='sipasPost_'+Date.now()+'_'+Math.floor(Math.random()*100000);const iframe=document.createElement('iframe');iframe.name=frame;iframe.style.display='none';const form=document.createElement('form');form.method='POST';form.action=API_URL;form.target=frame;form.style.display='none';const add=(k,v)=>{if(v===undefined||v===null)return;const i=document.createElement('input');i.type='hidden';i.name=k;i.value=typeof v==='object'?JSON.stringify(v):String(v);form.appendChild(i)};add('action',action);Object.keys(body).forEach(k=>add(k,body[k]));document.body.appendChild(iframe);document.body.appendChild(form);let finished=false;const finish=ok=>{if(finished)return;finished=true;setTimeout(()=>{iframe.remove();form.remove()},300);setStatus(ok?'Data berhasil dikirim • '+new Date().toLocaleTimeString('id-ID'):'Gagal mengirim data',ok);resolve(ok?{ok:true}:null)};iframe.onload=()=>finish(true);setTimeout(()=>finish(true),5000);try{form.submit()}catch(e){finish(false)}})}
+    setStatus('Mengirim data ke database...');
+    if(window.SIPAS_AUTH?.token) data=Object.assign({},data,{token:window.SIPAS_AUTH.token});
 
-async function serverLogin(email,password){setLoginMsg('Memeriksa akun...');const r=await apiGet('login',{email,password});if(!r?.ok)throw new Error(r?.message||'Email atau password salah.');const d=r.data||{};window.SIPAS_AUTH={token:d.token,user:d.user,org:null};localStorage.setItem('sipas_server_auth',JSON.stringify(window.SIPAS_AUTH));let b=await apiGet('bootstrap',{token:d.token});const bd=b?.data||{};const org=(bd.organizations||[]).find(o=>String(o.id)===String(d.user?.org_id))||null;window.SIPAS_AUTH.org=org;localStorage.setItem('sipas_server_auth',JSON.stringify(window.SIPAS_AUTH));applyRoleUI();hideLogin();if(d.user?.role==='SUPER_ADMIN'){showSuperAdmin(bd);return}if(b?.ok)applyServerData(bd);dashboard();overview()}
+    var frameName='silatPostFrame_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    var iframe=document.createElement('iframe');
+    iframe.name=frameName;
+    iframe.style.display='none';
 
-function applyRoleUI(){const a=window.SIPAS_AUTH;if(!a)return;const role=a.user?.role||'';$('brandTitle').textContent=a.org?.name||'SIPAS';$('brandSub').textContent='SIPAS • Sistem Informasi Penilaian Atlet Silat • By MASANN';const pill=$('userPill');pill.style.display='inline-flex';pill.textContent=(a.user?.name||a.user?.email||'User')+' • '+role;$('logoutBtn').style.display='inline-block';const allowed=role==='COACH'?['nDashboard','nMonitor','nAttendance','nEval','nTest']:['nDashboard','nMonitor','nAttendance','nEval','nTest','nAthlete','nReport','nPolicy'];document.querySelectorAll('.nav button').forEach(b=>{if(b.id)b.style.display=allowed.includes(b.id)?'':'none'})}
+    var form=document.createElement('form');
+    form.method='POST';
+    form.action=API_URL;
+    form.target=frameName;
+    form.style.display='none';
 
-async function showSuperAdmin(data){document.querySelectorAll('main,.nav').forEach(x=>x.style.display='none');$('superAdminPanel').style.display='block';const b=data||{};renderSuperAdmin(b.organizations||[])}
-function renderSuperAdmin(orgs){const box=$('saSchoolList');if(!orgs.length){box.innerHTML='<div class="sa-card">Belum ada sekolah/akademi.</div>';return}box.innerHTML=orgs.map(o=>{const st=String(o.status||'').toUpperCase();return `<div class="sa-card"><b>${esc(o.name)}</b><div class="small">Kode: ${esc(o.code||'-')}<br>Status: <b>${esc(st)}</b><br>Email: ${esc(o.email||'-')}<br>Telepon: ${esc(o.phone||'-')}</div><div class="sa-actions" style="margin-top:10px">${st!=='ACTIVE'?`<button class="sa-ok" onclick="schoolAction('ACTIVE','${esc(o.id)}')">Aktifkan</button>`:''}${st==='ACTIVE'&&o.id!=='TS_IMBI'?`<button class="sa-no" onclick="schoolAction('DISABLED','${esc(o.id)}')">Nonaktifkan</button>`:''}</div></div>`}).join('')}
-async function schoolAction(status,id){if(!confirm('Ubah status organisasi?'))return;const r=await api('approveOrganization',{org_id:id,status});if(!r?.ok)return alert('Gagal mengubah status.');const b=await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});renderSuperAdmin(b?.data||{})}
+    var actionInput=document.createElement('input');
+    actionInput.type='hidden';
+    actionInput.name='action';
+    actionInput.value=action;
 
-async function saveBulkAttendance(){const date=$('aDate').value;if(!date)return alert('Pilih tanggal.');const rows=[...document.querySelectorAll('.attendance-row')];let ok=0;for(const r of rows){const name=r.dataset.athlete;const idx=athletes.indexOf(name);const meta=athletesMeta[idx]||{};const athleteId=meta.id||null;if(!athleteId){continue}const status=r.querySelector('.aStatus').value;const sent=await api('saveAthleteAttendance',{athlete_id:athleteId,date,status:status==='Alpa'?'Tanpa Keterangan':status,notes:''});if(sent)ok++}alert(`Absensi diproses: ${ok} data dikirim ke server.`);}
+    var payloadInput=document.createElement('input');
+    payloadInput.type='hidden';
+    payloadInput.name='payload';
+    payloadInput.value=JSON.stringify(data);
 
-async function saveAthletes(){alert('Data atlet sekarang dikelola langsung melalui backend SIPAS. Fitur form atlet lama akan kita sambungkan ke field biodata lengkap berikutnya.');}
-async function saveTest(){const n=$('tAthlete').value;if(!n)return alert('Pilih atlet.');const idx=athletes.indexOf(n),meta=athletesMeta[idx]||{};if(!meta.id)return alert('ID atlet belum tersedia dari server.');const row={athlete_id:meta.id,stage:$('tStage').value,date:$('tDate').value,speed_seconds:$('speed').value,power_cm:$('power').value,agility_seconds:$('agility').value,stamina_value:$('stamina').value,stamina_unit:'menit/ronde',reaction_seconds:$('reaction').value,notes:''};const saved=await api('savePhysicalTest',row);if(saved){tests.push({...row,athlete:n});persist();alert('Tes fisik tersimpan.');testHistory()}}
-async function saveEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return alert('Pilih atlet.');const idx=athletes.indexOf(n),meta=athletesMeta[idx]||{};if(!meta.id)return alert('ID atlet belum tersedia dari server.');const scores={};document.querySelectorAll('.score').forEach(x=>{if(x.value)scores[x.dataset.ind]=+x.value});if(Object.keys(scores).length!==12)return alert('Isi semua 12 indikator.');const row={athlete_id:meta.id,stage:s,technique:scores.Teknik,footwork:scores.Footwork,speed:scores.Kecepatan,power:scores.Power,agility:scores.Agility,stamina:scores.Stamina,reaction:scores.Reaction,tactics:scores.Taktik,sparring:scores.Sparring,discipline:scores.Disiplin,independent_training:scores['Latihan Mandiri'],mental:scores.Mental,notes:$('eNote').value};const saved=await api('saveEvaluation',row);if(saved){alert('Evaluasi tersimpan.');await autoSync();loadEval()}}
+    form.appendChild(actionInput);
+    form.appendChild(payloadInput);
 
-async function syncNow(){if(!API_URL)return alert('URL database belum tersedia.');const r=await apiGet('bootstrap',{token:window.SIPAS_AUTH?.token||''});if(!r?.ok)return;const d=r.data||{};normalizeServerData(d);setStatus('Online • data terbaru dari database',true);}
-async function autoSync(){if(!API_URL||!window.SIPAS_AUTH?.token)return;const r=await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});if(r?.ok){normalizeServerData(r.data||{});setStatus('Online • data terbaru dari database',true)}}
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
 
-/* Form lama pendaftaran publik belum didukung backend saat ini; arahkan ke Super Admin. */
-document.getElementById('registerForm').addEventListener('submit',function(e){e.preventDefault();setLoginMsg('Pendaftaran sekolah publik belum diaktifkan pada backend. Sekolah ditambahkan oleh Super Admin.')});
+    var finished=false;
 
-document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{await serverLogin(document.getElementById('loginEmail').value.trim(),document.getElementById('loginPassword').value)}catch(err){setLoginMsg(err.message)}});
-document.getElementById('logoutBtn').onclick=doLogout;
-document.getElementById('saLogout').onclick=doLogout;
+    function cleanup(){
+      if(finished)return;
+      finished=true;
+      setTimeout(function(){
+        form.remove();
+        iframe.remove();
+      },500);
+    }
 
-$('apiUrl').value=API_URL;
+    iframe.onload=function(){
+      cleanup();
+      setStatus('Data berhasil dikirim • '+new Date().toLocaleTimeString('id-ID'),true);
+      resolve({ok:true});
+    };
+
+    setTimeout(function(){
+      if(finished)return;
+      cleanup();
+      setStatus('Data dikirim • menunggu verifikasi...',true);
+      resolve({ok:true});
+    },5000);
+
+    try{
+      form.submit();
+    }catch(err){
+      cleanup();
+      setStatus('Gagal mengirim data ke server');
+      resolve(null);
+    }
+  });
+}
+function apiGet(action,extra={}){return new Promise(resolve=>{if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}const callbackName='sipasCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);const script=document.createElement('script');let selesai=false;let timer;function cleanup(){if(selesai)return;selesai=true;clearTimeout(timer);script.remove();delete window[callbackName]}timer=setTimeout(()=>{cleanup();setStatus('Koneksi habis');resolve(null)},20000);window[callbackName]=result=>{cleanup();if(!result||!result.ok){setStatus(result?.error||result?.message||'Gagal membaca database');resolve(result||null);return}setStatus('Database terhubung • '+new Date().toLocaleTimeString('id-ID'),true);resolve(result)};script.onerror=()=>{cleanup();setStatus('Gagal memuat respons API');resolve(null)};const params=Object.assign({},extra,{action,callback:callbackName,t:Date.now()});script.src=API_URL+'?'+new URLSearchParams(params).toString();document.body.appendChild(script)})}
+
+async function syncNow(){
+  if(!API_URL){
+    alert('Masukkan URL Web App Google Apps Script terlebih dahulu.');
+    return;
+  }
+
+  const result=await apiGet('bootstrap');
+  if(!result)return;
+
+  const d=result.data||{};
+  const hasServer=
+    (Array.isArray(d.athletes)&&d.athletes.length>0)||
+    (d.monitoring||[]).length||
+    (d.evaluations||[]).length||
+    (d.tests||[]).length;
+
+  if(!hasServer){
+    const upload=await api('saveAll',{
+      athletes:athletes.map((name,i)=>({
+        name:name,
+        info:athletesMeta[i]?.info||'',
+        oldName:''
+      })),
+      monitoring:mon,
+      evaluations:ev,
+      tests:tests
+    });
+
+    if(!upload){
+      setStatus('Pengiriman gagal');
+      alert('Data belum dapat dikirim ke database.');
+      return;
+    }
+
+    setStatus('Memeriksa data di server...');
+
+    await new Promise(function(resolve){
+      setTimeout(resolve,2000);
+    });
+
+    const verify=await apiGet('bootstrap');
+
+    if(verify){
+      const vd=verify.data||{};
+      const serverCount=
+        (vd.athletes||[]).length+
+        (vd.monitoring||[]).length+
+        (vd.evaluations||[]).length+
+        (vd.tests||[]).length;
+
+      if(serverCount>0){
+        setStatus('Database berhasil diisi • '+new Date().toLocaleTimeString('id-ID'),true);
+        alert('Berhasil. Data lokal sudah masuk ke Google Sheets.');
+        return;
+      }
+    }
+
+    setStatus('Database terbaca kosong; pengiriman perlu diperiksa');
+    alert('Pengiriman sudah dilakukan, tetapi server belum menunjukkan data. Silakan coba Sinkronkan sekali lagi.');
+    return;
+  }
+
+  if(!confirm('Database berisi data. Muat data server ke perangkat ini? Data lokal yang belum tersinkron dapat tertimpa.'))return;
+
+  athletes=(d.athletes||[]).map(x=>x.name);
+  athletesMeta=(d.athletes||[]).map(x=>({info:x.info||''}));
+  mon=d.monitoring||[];
+  ev=d.evaluations||[];
+  tests=d.tests||[];
+
+  saveLocal();
+  renderAll();
+  setStatus('Data server berhasil dimuat',true);
+}
+
+async function autoSync(){
+  if(!API_URL)return;
+  const result=await apiGet('bootstrap');
+  if(!result)return;
+
+  const d=result.data||{};
+  const serverAth=d.athletes||[];
+  const serverMon=d.monitoring||[];
+  const serverEv=d.evaluations||[];
+  const serverTests=d.tests||[];
+  const serverHasData=serverAth.length>0||serverMon.length>0||serverEv.length>0||serverTests.length>0;
+
+  if(serverHasData){
+    applyServerData(d);
+    setStatus('Online • data terbaru dari database',true);
+    return;
+  }
+
+  if(hasRealLocalData()){
+    const sent=await api('saveAll',{
+      athletes:athletes.map((name,i)=>({
+        name:name,
+        info:athletesMeta[i]?.info||'',
+        oldName:''
+      })),
+      monitoring:mon,
+      evaluations:ev,
+      tests:tests
+    });
+    if(sent){
+      setStatus('Online • data perangkat dikirim ke database',true);
+    }
+  }else{
+    setStatus('Online • database siap',true);
+  }
+}
+
+let autoSyncTimer=null;
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible' && API_URL){
+    clearTimeout(autoSyncTimer);
+    autoSyncTimer=setTimeout(autoSync,500);
+  }
+});
+window.SIPAS_AUTH=JSON.parse(localStorage.getItem('sipas_server_auth')||'null');function setLoginMsg(t){const el=document.getElementById('loginMsg');if(el)el.textContent=t||''}function hideLogin(){document.getElementById('loginGate').style.display='none'}function showLogin(){document.getElementById('loginGate').style.display='flex';document.getElementById('superAdminPanel').style.display='none'}function applyRoleUI(){const a=window.SIPAS_AUTH;if(!a)return;const role=a.user?.role||'';document.getElementById('brandTitle').textContent=a.org?.name||'SIPAS';document.getElementById('brandSub').textContent='SIPAS • Sistem Informasi Penilaian Atlet Silat • By MASANN';const pill=document.getElementById('userPill');pill.style.display='inline-flex';pill.textContent=(a.user?.name||a.user?.email||'User')+' • '+role;document.getElementById('logoutBtn').style.display='inline-block';const allowed=role==='coach'?['nDashboard','nMonitor','nAttendance','nEval','nTest']:['nDashboard','nMonitor','nEval','nTest','nAthlete','nReport','nPolicy'];document.querySelectorAll('.nav button').forEach(b=>b.style.display=allowed.includes(b.id)?'':'none')}async function serverLogin(email,password){setLoginMsg('Memeriksa akun...');const r=await apiGet('login',{email,password});if(!r?.ok)throw new Error(r?.error||r?.message||'Email atau password salah.');const d=r.data||r;const token=d.token;const user=d.user;const org=d.org||null;if(!token||!user)throw new Error('Respons login dari server tidak lengkap.');window.SIPAS_AUTH={token,user,org};localStorage.setItem('sipas_server_auth',JSON.stringify(window.SIPAS_AUTH));applyRoleUI();hideLogin();if(user?.role==='SUPER_ADMIN'||user?.role==='superadmin'){showSuperAdmin(r);return}const b=await apiGet('bootstrap',{token});if(b?.ok)applyServerData(b.data||b);dashboard();overview()}async function showSuperAdmin(data){document.querySelectorAll('main,.nav').forEach(x=>x.style.display='none');document.getElementById('superAdminPanel').style.display='block';const b=data||await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});renderSuperAdmin(b?.organizations||b?.orgs||[])}function renderSuperAdmin(orgs){const box=document.getElementById('saSchoolList');if(!orgs.length){box.innerHTML='<div class="sa-card">Belum ada sekolah terdaftar.</div>';return}box.innerHTML=orgs.map(o=>`<div class="sa-card"><b>${esc(o.name)}</b><div class="small">Admin: ${esc(o.admin_name||'-')} • ${esc(o.admin_email||'-')}<br>Status: <b>${esc(o.status||'-')}</b></div><div class="sa-actions" style="margin-top:10px">${o.status==='pending'?`<button class="sa-ok" onclick="schoolAction('approveSchool','${o.id}')">Approve</button><button class="sa-no" onclick="schoolAction('rejectSchool','${o.id}')">Tolak</button>`:''}${o.status==='active'?`<button class="sa-no" onclick="schoolAction('disableSchool','${o.id}')">Nonaktifkan</button>`:''}${o.status==='disabled'?`<button class="sa-ok" onclick="schoolAction('activateSchool','${o.id}')">Aktifkan</button>`:''}</div></div>`).join('')}async function schoolAction(action,id){if(!confirm('Lanjutkan tindakan ini?'))return;const r=await api(action,{id});if(!r?.ok)return alert(r?.error||'Gagal.');showSuperAdmin()}async function doLogout(){if(window.SIPAS_AUTH?.token)await api('logout',{token:window.SIPAS_AUTH.token});localStorage.removeItem('sipas_server_auth');location.reload()}
+function safeJson(s,f){try{return JSON.parse(s)}catch(e){return f}}
+document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{await serverLogin(document.getElementById('loginEmail').value.trim(),document.getElementById('loginPassword').value)}catch(err){setLoginMsg(err.message)}});document.getElementById('showRegister').onclick=()=>{document.getElementById('registerBox').style.display='block';document.getElementById('loginForm').style.display='none';document.getElementById('showRegister').style.display='none'};document.getElementById('cancelRegister').onclick=()=>{document.getElementById('registerBox').style.display='none';document.getElementById('loginForm').style.display='block';document.getElementById('showRegister').style.display='block'};document.getElementById('registerForm').addEventListener('submit',async e=>{e.preventDefault();setLoginMsg('Mengirim pendaftaran...');const payload={name:regSchool.value.trim(),admin_name:regAdmin.value.trim(),admin_email:regEmail.value.trim(),phone:regPhone.value.trim(),password:regPassword.value,address:regAddress.value.trim()};const r=await apiGet('registerSchool',payload);if(!r?.ok)return setLoginMsg(r?.error||'Pendaftaran gagal.');alert('Pendaftaran berhasil dikirim. Menunggu persetujuan Super Admin.');location.reload()});document.getElementById('logoutBtn').onclick=doLogout;document.getElementById('saLogout').onclick=doLogout;
 init();
 </script>
 </body>
