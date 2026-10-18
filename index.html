@@ -245,7 +245,8 @@ const defaults=Array.from({length:25},(_,i)=>`Atlet ${String(i+1).padStart(2,'0'
 let athletes=readLocal(K.ath,null)||defaults;
 let athletesMeta=readLocal('silat_athletes_meta',[]);
 let mon=readLocal(K.mon,[]),ev=readLocal(K.ev,[]),tests=readLocal(K.test,[]);
-let API_URL=localStorage.getItem('silat_api_url')||DEFAULT_API_URL;
+let API_URL=DEFAULT_API_URL;
+try{const savedApi=localStorage.getItem('silat_api_url');if(savedApi&&savedApi.includes('script.google.com/macros/s/'))API_URL=savedApi;}catch(e){}
 const indicators=['Teknik','Footwork','Kecepatan','Power','Agility','Stamina','Reaction','Taktik','Sparring','Disiplin','Latihan Mandiri','Mental'];
 const $=id=>document.getElementById(id);
 function readLocal(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch(e){return fallback}}
@@ -402,7 +403,27 @@ function api(action,data={}){
     }
   });
 }
-function apiGet(action,extra={}){return new Promise(resolve=>{if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}const callbackName='sipasCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);const script=document.createElement('script');let selesai=false;let timer;function cleanup(){if(selesai)return;selesai=true;clearTimeout(timer);script.remove();delete window[callbackName]}timer=setTimeout(()=>{cleanup();setStatus('Koneksi habis');resolve(null)},20000);window[callbackName]=result=>{cleanup();if(!result||!result.ok){setStatus(result?.error||result?.message||'Gagal membaca database');resolve(result||null);return}setStatus('Database terhubung • '+new Date().toLocaleTimeString('id-ID'),true);resolve(result)};script.onerror=()=>{cleanup();setStatus('Gagal memuat respons API');resolve(null)};const params=Object.assign({},extra,{action,callback:callbackName,t:Date.now()});script.src=API_URL+'?'+new URLSearchParams(params).toString();document.body.appendChild(script)})}
+function apiGet(action,extra={}){return new Promise(resolve=>{
+  if(!API_URL){setStatus('Belum terhubung ke database');resolve(null);return}
+  const callbackName='sipasCallback_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+  const script=document.createElement('script');
+  let selesai=false;
+  let timer;
+  function cleanup(){if(selesai)return;selesai=true;clearTimeout(timer);script.remove();try{delete window[callbackName]}catch(e){window[callbackName]=undefined}}
+  window[callbackName]=result=>{
+    if(selesai)return;
+    cleanup();
+    if(!result||result.ok!==true){setStatus(result?.error||result?.message||'Gagal membaca database');resolve(result||null);return}
+    setStatus('Database terhubung • '+new Date().toLocaleTimeString('id-ID'),true);
+    resolve(result);
+  };
+  timer=setTimeout(()=>{cleanup();setStatus('Koneksi API timeout. Cek URL Web App dan deployment Apps Script.');resolve(null)},20000);
+  script.onerror=()=>{cleanup();setStatus('Gagal memuat respons API. Pastikan Web App sudah dideploy ulang.');resolve(null)};
+  const params=new URLSearchParams(Object.assign({},extra,{action,callback:callbackName,t:Date.now()}));
+  script.src=API_URL+(API_URL.includes('?')?'&':'?')+params.toString();
+  script.async=true;
+  document.head.appendChild(script);
+})}
 
 async function syncNow(){
   if(!API_URL){
@@ -523,7 +544,37 @@ document.addEventListener('visibilitychange',function(){
     autoSyncTimer=setTimeout(autoSync,500);
   }
 });
-window.SIPAS_AUTH=JSON.parse(localStorage.getItem('sipas_server_auth')||'null');function setLoginMsg(t){const el=document.getElementById('loginMsg');if(el)el.textContent=t||''}function hideLogin(){document.getElementById('loginGate').style.display='none'}function showLogin(){document.getElementById('loginGate').style.display='flex';document.getElementById('superAdminPanel').style.display='none'}function applyRoleUI(){const a=window.SIPAS_AUTH;if(!a)return;const role=a.user?.role||'';document.getElementById('brandTitle').textContent=a.org?.name||'SIPAS';document.getElementById('brandSub').textContent='SIPAS • Sistem Informasi Penilaian Atlet Silat • By MASANN';const pill=document.getElementById('userPill');pill.style.display='inline-flex';pill.textContent=(a.user?.name||a.user?.email||'User')+' • '+role;document.getElementById('logoutBtn').style.display='inline-block';const allowed=role==='coach'?['nDashboard','nMonitor','nAttendance','nEval','nTest']:['nDashboard','nMonitor','nEval','nTest','nAthlete','nReport','nPolicy'];document.querySelectorAll('.nav button').forEach(b=>b.style.display=allowed.includes(b.id)?'':'none')}async function serverLogin(email,password){setLoginMsg('Memeriksa akun...');const r=await apiGet('login',{email,password});if(!r?.ok)throw new Error(r?.error||r?.message||'Email atau password salah.');const d=r.data||r;const token=d.token;const user=d.user;const org=d.org||null;if(!token||!user)throw new Error('Respons login dari server tidak lengkap.');window.SIPAS_AUTH={token,user,org};localStorage.setItem('sipas_server_auth',JSON.stringify(window.SIPAS_AUTH));applyRoleUI();hideLogin();if(user?.role==='SUPER_ADMIN'||user?.role==='superadmin'){showSuperAdmin(r);return}const b=await apiGet('bootstrap',{token});if(b?.ok)applyServerData(b.data||b);dashboard();overview()}async function showSuperAdmin(data){document.querySelectorAll('main,.nav').forEach(x=>x.style.display='none');document.getElementById('superAdminPanel').style.display='block';const b=data||await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});renderSuperAdmin(b?.organizations||b?.orgs||[])}function renderSuperAdmin(orgs){const box=document.getElementById('saSchoolList');if(!orgs.length){box.innerHTML='<div class="sa-card">Belum ada sekolah terdaftar.</div>';return}box.innerHTML=orgs.map(o=>`<div class="sa-card"><b>${esc(o.name)}</b><div class="small">Admin: ${esc(o.admin_name||'-')} • ${esc(o.admin_email||'-')}<br>Status: <b>${esc(o.status||'-')}</b></div><div class="sa-actions" style="margin-top:10px">${o.status==='pending'?`<button class="sa-ok" onclick="schoolAction('approveSchool','${o.id}')">Approve</button><button class="sa-no" onclick="schoolAction('rejectSchool','${o.id}')">Tolak</button>`:''}${o.status==='active'?`<button class="sa-no" onclick="schoolAction('disableSchool','${o.id}')">Nonaktifkan</button>`:''}${o.status==='disabled'?`<button class="sa-ok" onclick="schoolAction('activateSchool','${o.id}')">Aktifkan</button>`:''}</div></div>`).join('')}async function schoolAction(action,id){if(!confirm('Lanjutkan tindakan ini?'))return;const r=await api(action,{id});if(!r?.ok)return alert(r?.error||'Gagal.');showSuperAdmin()}async function doLogout(){if(window.SIPAS_AUTH?.token)await api('logout',{token:window.SIPAS_AUTH.token});localStorage.removeItem('sipas_server_auth');location.reload()}
+window.SIPAS_AUTH=JSON.parse(localStorage.getItem('sipas_server_auth')||'null');
+function setLoginMsg(t){const el=document.getElementById('loginMsg');if(el)el.textContent=t||''}
+function hideLogin(){const el=document.getElementById('loginGate');if(el)el.style.display='none'}
+function showLogin(){const el=document.getElementById('loginGate');if(el)el.style.display='flex';const sa=document.getElementById('superAdminPanel');if(sa)sa.style.display='none'}
+function applyRoleUI(){const a=window.SIPAS_AUTH;if(!a||!a.user)return;const role=String(a.user.role||'').toUpperCase();document.getElementById('brandTitle').textContent=a.org?.name||'SIPAS';document.getElementById('brandSub').textContent='SIPAS • Sistem Informasi Penilaian Atlet Silat • By MASANN';const pill=document.getElementById('userPill');pill.style.display='inline-flex';pill.textContent=(a.user.name||a.user.email||'User')+' • '+role;document.getElementById('logoutBtn').style.display='inline-block';const allowed=role==='COACH'?['nDashboard','nMonitor','nAttendance','nEval','nTest']:['nDashboard','nMonitor','nAttendance','nEval','nTest','nAthlete','nReport','nPolicy'];document.querySelectorAll('.nav button').forEach(b=>b.style.display=allowed.includes(b.id)?'':'none')}
+async function serverLogin(email,password){
+  setLoginMsg('Memeriksa akun...');
+  try{
+    const r=await apiGet('login',{email,password});
+    if(!r||r.ok!==true)throw new Error(r?.error||r?.message||'Login gagal.');
+    const d=r.data||r;
+    const token=d.token,user=d.user,org=d.org||null;
+    if(!token||!user)throw new Error('Respons login dari server tidak lengkap.');
+    window.SIPAS_AUTH={token,user,org};
+    localStorage.setItem('sipas_server_auth',JSON.stringify(window.SIPAS_AUTH));
+    applyRoleUI();
+    hideLogin();
+    if(String(user.role||'').toUpperCase()==='SUPER_ADMIN'){showSuperAdmin(r);return}
+    setStatus('Login berhasil • memuat data...');
+    const b=await apiGet('bootstrap',{token});
+    if(b?.ok)applyServerData(b.data||b);
+    dashboard();overview();
+  }catch(err){
+    localStorage.removeItem('sipas_server_auth');
+    window.SIPAS_AUTH=null;
+    showLogin();
+    setLoginMsg(err?.message||String(err)||'Login gagal.');
+    throw err;
+  }
+}
+async function showSuperAdmin(data){document.querySelectorAll('main,.nav').forEach(x=>x.style.display='none');document.getElementById('superAdminPanel').style.display='block';const b=data?.data||data||await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});renderSuperAdmin(b?.organizations||b?.orgs||[])}function renderSuperAdmin(orgs){const box=document.getElementById('saSchoolList');if(!orgs.length){box.innerHTML='<div class="sa-card">Belum ada sekolah terdaftar.</div>';return}box.innerHTML=orgs.map(o=>`<div class="sa-card"><b>${esc(o.name)}</b><div class="small">Admin: ${esc(o.admin_name||'-')} • ${esc(o.admin_email||'-')}<br>Status: <b>${esc(o.status||'-')}</b></div></div>`).join('')}async function schoolAction(action,id){if(!confirm('Lanjutkan tindakan ini?'))return;const r=await api(action,{id});if(!r?.ok)return alert(r?.error||'Gagal.');showSuperAdmin()}async function doLogout(){if(window.SIPAS_AUTH?.token)await api('logout',{token:window.SIPAS_AUTH.token});localStorage.removeItem('sipas_server_auth');location.reload()}
 function safeJson(s,f){try{return JSON.parse(s)}catch(e){return f}}
 document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{await serverLogin(document.getElementById('loginEmail').value.trim(),document.getElementById('loginPassword').value)}catch(err){setLoginMsg(err.message)}});document.getElementById('showRegister').onclick=()=>{document.getElementById('registerBox').style.display='block';document.getElementById('loginForm').style.display='none';document.getElementById('showRegister').style.display='none'};document.getElementById('cancelRegister').onclick=()=>{document.getElementById('registerBox').style.display='none';document.getElementById('loginForm').style.display='block';document.getElementById('showRegister').style.display='block'};document.getElementById('registerForm').addEventListener('submit',async e=>{e.preventDefault();setLoginMsg('Mengirim pendaftaran...');const payload={name:regSchool.value.trim(),admin_name:regAdmin.value.trim(),admin_email:regEmail.value.trim(),phone:regPhone.value.trim(),password:regPassword.value,address:regAddress.value.trim()};const r=await apiGet('registerSchool',payload);if(!r?.ok)return setLoginMsg(r?.error||'Pendaftaran gagal.');alert('Pendaftaran berhasil dikirim. Menunggu persetujuan Super Admin.');location.reload()});document.getElementById('logoutBtn').onclick=doLogout;document.getElementById('saLogout').onclick=doLogout;
 init();
