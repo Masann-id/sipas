@@ -349,7 +349,11 @@ function init(){
   renderAthletes();$('scoreInputs').innerHTML=indicators.map(x=>`<label>${x} (1–5)</label><input class="score" data-ind="${esc(x)}" type="number" min="1" max="5" step=".1" placeholder="1–5">`).join('');
   $('apiUrl').value=API_URL;initAttendance();bindPulseInputs();setStatus(API_URL?'Silakan login':'Belum terhubung ke database');
   initLocationMap();
-  restoreSession();
+  // SIPAS: setiap refresh halaman wajib login ulang.
+  // Session server/local tidak dipulihkan otomatis setelah refresh.
+  localStorage.removeItem('sipas_server_auth');
+  window.SIPAS_AUTH=null;
+  showLogin();
 }
 function page(p){['dashboard','monitor','attendance','eval','test','athlete','report','policy','orgSettings','coachPerformance'].forEach(x=>{const el=$(x);if(el)el.classList.toggle('hidden',x!==p)});document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));const map={dashboard:'nDashboard',monitor:'nMonitor',attendance:'nAttendance',eval:'nEval',test:'nTest',athlete:'nAthlete',report:'nReport',policy:'nPolicy',orgSettings:'nOrgSettings',coachPerformance:'nCoachPerformance'};if(map[p]&&$(map[p]))$(map[p]).classList.add('active');if(p==='dashboard')dashboard();if(p==='eval')loadEval();if(p==='test')testHistory();if(p==='report')report();if(p==='orgSettings'){renderOrgSettings();setTimeout(()=>{initLocationMap();if(locationMap)locationMap.invalidateSize(true);},150);}if(p==='coachPerformance')renderCoachPerformance()}
 function dashboard(){
