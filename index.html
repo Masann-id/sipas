@@ -221,9 +221,9 @@ table td,table th{border-color:var(--line)!important}
 <div class="attendance-summary"><b id="aSummary">0 hadir • 0 izin • 0 sakit • 0 alpa</b><span class="small">Klik hanya pada atlet yang statusnya bukan Hadir.</span></div>
 <div id="attendanceList"></div><button class="btn primary" onclick="saveBulkAttendance()">💾 Simpan Absensi Kelompok</button></div>
 
-<div class="card"><h2>📍 Absensi Pelatih</h2><p class="small">Wajib <b>GPS maksimal 200 meter</b> dari lokasi latihan + <b>foto/selfie</b>. Foto disimpan di perangkat; server menerima metadata/verifikasi.</p>
+<div class="card"><h2>📍 Absensi Pelatih</h2><p class="small">Wajib <b>GPS sesuai radius lokasi latihan</b> + <b>foto/selfie</b>. Foto otomatis diberi <b>camera stamp</b> berisi nama pelatih, organisasi, tanggal/jam, lokasi, koordinat, akurasi, dan jarak.</p>
 <div class="grid"><div><label>Sesi Latihan</label><select id="coachSession"><option value="">Pilih sesi</option></select></div><div><label>Lokasi Latihan</label><input id="coachLocation" placeholder="Contoh: Dojo Utama"></div></div>
-<div class="coach-att-box"><div class="camera-box"><video id="coachVideo" autoplay playsinline></video><canvas id="coachCanvas" class="hidden"></canvas><img id="coachPhotoPreview" class="hidden" alt="Preview selfie"><div id="cameraPlaceholder" class="camera-placeholder">Kamera belum aktif</div></div><div class="camera-actions"><button type="button" class="btn muted" onclick="startCoachCamera()">📷 Buka Kamera</button><button type="button" class="btn primary" onclick="takeCoachPhoto()">📸 Ambil Foto</button></div></div>
+<div class="coach-att-box"><div class="camera-box"><video id="coachVideo" autoplay playsinline></video><canvas id="coachCanvas" class="hidden"></canvas><img id="coachPhotoPreview" class="hidden" alt="Preview selfie"><div id="cameraPlaceholder" class="camera-placeholder">Kamera belum aktif</div></div><div class="camera-actions"><button type="button" class="btn muted" onclick="startCoachCamera()">📷 Buka Kamera</button><button type="button" class="btn muted" onclick="switchCoachCamera()">🔄 Putar Kamera</button><button type="button" class="btn primary" onclick="takeCoachPhoto()">📸 Ambil Foto + Stamp</button></div></div>
 <div class="gps-box"><div><b>GPS</b><span id="gpsStatus">Belum dicek</span></div><button type="button" class="btn muted" onclick="checkCoachGPS()">📍 Cek Lokasi</button></div>
 <div id="coachAttendanceStatus" class="pulse-status neutral">Absensi membutuhkan GPS dan foto.</div><button class="btn primary" onclick="saveCoachAttendance()">✅ Hadirkan Pelatih</button></div>
 </section>
@@ -320,25 +320,43 @@ async function restoreSession(){
   if(!raw){showLogin();return}
   try{
     window.SIPAS_AUTH=JSON.parse(raw);
-    if(!window.SIPAS_AUTH?.token||!window.SIPAS_AUTH?.user){throw new Error('Session lokal tidak lengkap.')}
+    if(!window.SIPAS_AUTH?.token||!window.SIPAS_AUTH?.user)throw new Error('Session lokal tidak lengkap.');
+
+    // Pulihkan tampilan dari session lokal TERLEBIH DAHULU.
+    // Jangan menunggu API untuk menentukan apakah refresh dianggap logout.
     hideLogin();
-    setStatus('Memeriksa session...');
+    applyRoleUI();
+    setStatus('Session dipulihkan • memuat data terbaru...',true);
+
+    const role=String(window.SIPAS_AUTH.user?.role||'').toUpperCase();
+    if(role==='SUPER_ADMIN'){
+      showSuperAdmin({data:{organizations:[]}});
+    }else{
+      dashboard();
+      overview();
+    }
+
+    // Verifikasi ke server dilakukan di belakang layar.
+    // Jika server gagal sementara, pengguna TETAP dianggap login.
     const b=await apiGet('bootstrap',{token:window.SIPAS_AUTH.token});
-    if(!b||b.ok!==true){
-      const msg=String(b?.error||b?.message||'');
-      const invalid=/session|pengguna tidak aktif|organisasi.*tidak ditemukan|organisasi.*belum aktif/i.test(msg);
-      if(invalid){localStorage.removeItem('sipas_server_auth');window.SIPAS_AUTH=null;showLogin();setLoginMsg(msg||'Session telah berakhir. Silakan login kembali.');}
-      else{setStatus('Server belum merespons. Session tetap disimpan, silakan coba lagi.',false);applyRoleUI();}
+    if(b?.ok){
+      applyServerData(b.data||b);
+      applyRoleUI();
+      if(role==='SUPER_ADMIN')showSuperAdmin(b);
+      else{dashboard();overview();}
       return;
     }
-    applyServerData(b.data||b);
-    applyRoleUI();
-    if(String(window.SIPAS_AUTH.user?.role||'').toUpperCase()==='SUPER_ADMIN')showSuperAdmin(b);
-    else{dashboard();overview();}
+
+    // Hanya logout otomatis jika server benar-benar menyatakan token invalid.
+    // apiGet dapat mengembalikan null saat jaringan/JSONP bermasalah, dan itu BUKAN logout.
+    console.warn('Bootstrap session tidak dapat diverifikasi saat refresh; session lokal dipertahankan.');
+    setStatus('Session tetap aktif • server sedang tidak dapat diverifikasi.',false);
   }catch(e){
     console.warn('Restore session:',e);
-    setStatus('Session tersimpan. Koneksi server sedang diperiksa.',false);
-    applyRoleUI();
+    localStorage.removeItem('sipas_server_auth');
+    window.SIPAS_AUTH=null;
+    showLogin();
+    setLoginMsg('Session tidak dapat dipulihkan. Silakan login kembali.');
   }
 }
 function init(){
@@ -393,12 +411,15 @@ function initAttendance(){const d=new Date();const localDate=new Date(d.getTime(
 function renderAttendanceList(){const box=$('attendanceList');if(!box)return;const sid=$('aSession')?.value;const session=(window.SIPAS_SESSIONS||[]).find(x=>String(x.id)===String(sid));let list=athletesWithObjects();if(session&&session.group_scope&&session.group_scope!=='GABUNGAN')list=list.filter(a=>String(a.gender||'').toUpperCase()===session.group_scope);box.innerHTML=list.map((a,i)=>`<div class="attendance-row" data-athlete-id="${esc(a.id||'')}" data-athlete="${esc(a.name||'')}"><div><b>${esc(a.name||'')}</b><span class="small">${esc(a.gender||'')}</span></div><select class="aStatus"><option>Hadir</option><option>Izin</option><option>Sakit</option><option>Alpa</option></select></div>`).join('');box.querySelectorAll('.aStatus').forEach(x=>x.onchange=updateAttendanceSummary);updateAttendanceSummary()}
 function updateAttendanceSummary(){const st=[...document.querySelectorAll('.aStatus')].map(x=>x.value);const c=v=>st.filter(x=>x===v).length;$('aSummary').textContent=`${c('Hadir')} hadir • ${c('Izin')} izin • ${c('Sakit')} sakit • ${c('Alpa')} alpa`}
 async function saveBulkAttendance(){const date=$('aDate').value,sid=$('aSession')?.value;if(!date||!sid)return alert('Pilih tanggal dan sesi latihan.');const rows=[...document.querySelectorAll('.attendance-row')].map(r=>({id:String(Date.now())+'_'+Math.random().toString(36).slice(2,7),athlete_id:r.dataset.athleteId,schedule_id:sid,date,status:r.querySelector('.aStatus').value}));const localKey='sipas_student_attendance';const old=readLocal(localKey,[]);const merged=old.filter(x=>!(x.date===date&&x.schedule_id===sid));localStorage.setItem(localKey,JSON.stringify(merged.concat(rows)));if(API_URL)await api('saveBulkAttendance',{rows});alert('Absensi sesi tersimpan. '+rows.filter(x=>x.status==='Hadir').length+' atlet hadir.');dashboard()}
-let coachStream=null,coachPhotoData='';
-async function startCoachCamera(){try{coachStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});$('coachVideo').srcObject=coachStream;$('coachVideo').classList.remove('hidden');$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.add('hidden')}catch(e){alert('Kamera tidak dapat dibuka. Pastikan izin kamera diberikan dan halaman dibuka melalui HTTPS.')}}
-function takeCoachPhoto(){const v=$('coachVideo'),c=$('coachCanvas');if(!v.srcObject||!v.videoWidth)return alert('Buka kamera terlebih dahulu.');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0,c.width,c.height);coachPhotoData=c.toDataURL('image/jpeg',0.72);$('coachPhotoPreview').src=coachPhotoData;$('coachPhotoPreview').classList.remove('hidden');$('coachVideo').classList.add('hidden');$('coachAttendanceStatus').className='pulse-status good';$('coachAttendanceStatus').textContent='Foto berhasil diambil. Selanjutnya cek GPS.';if(coachStream){coachStream.getTracks().forEach(t=>t.stop());coachStream=null}}
+let coachStream=null,coachPhotoData='',coachFacingMode='user';
+async function startCoachCamera(){try{if(coachStream)coachStream.getTracks().forEach(t=>t.stop());coachStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:coachFacingMode}},audio:false});$('coachVideo').srcObject=coachStream;$('coachVideo').classList.remove('hidden');$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.add('hidden')}catch(e){alert('Kamera tidak dapat dibuka. Pastikan izin kamera diberikan dan halaman dibuka melalui HTTPS.')}}
+async function switchCoachCamera(){coachFacingMode=coachFacingMode==='user'?'environment':'user';await startCoachCamera()}
+function nearestCoachLocation(lat,lng){const arr=window.SIPAS_DATA?.locations||[];let best=null;arr.filter(x=>String(x.status||'').toUpperCase()==='ACTIVE').forEach(x=>{const la=Number(x.latitude),lo=Number(x.longitude);if(!isFinite(la)||!isFinite(lo))return;const R=6371000,dLat=(lat-la)*Math.PI/180,dLon=(lng-lo)*Math.PI/180,a=Math.sin(dLat/2)**2+Math.cos(lat*Math.PI/180)*Math.cos(la*Math.PI/180)*Math.sin(dLon/2)**2,d=2*R*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)),radius=Number(x.radius_meter||200);if(!best||d<best.distance)best={location:x,distance:d,radius};});return best}
+function drawStamp(ctx,w,h){const a=window.SIPAS_AUTH?.user||{};const org=window.SIPAS_AUTH?.org||{};const hit=nearestCoachLocation(coachGps.lat,coachGps.lng);const now=new Date();const pad=n=>String(n).padStart(2,'0');const stamp=[String(org.name||org.org_name||'SIPAS').toUpperCase(),String(a.name||a.full_name||'PELATIH'),`${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,`Lokasi: ${hit?.location?.name||$('coachLocation').value.trim()||'Lokasi Latihan'}`,`GPS: ${coachGps.lat.toFixed(6)}, ${coachGps.lng.toFixed(6)}`,`Akurasi GPS: ±${Math.round(coachGps.accuracy||0)} m`,hit?`Jarak: ${Math.round(hit.distance)} m / Radius ${Math.round(hit.radius)} m`:'GPS: menunggu validasi server','GPS VERIFIED • SIPAS'];const padX=Math.max(14,Math.round(w*0.025)),lineH=Math.max(22,Math.round(h*0.035)),boxH=lineH*stamp.length+padX*1.4;ctx.save();ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(0,h-boxH,w,boxH);ctx.fillStyle='#fff';ctx.font=`600 ${Math.max(14,Math.round(w*0.018))}px Arial`;stamp.forEach((t,i)=>ctx.fillText(t,padX,h-boxH+padX+i*lineH));ctx.restore()}
+function takeCoachPhoto(){const v=$('coachVideo'),c=$('coachCanvas');if(!v.srcObject||!v.videoWidth)return alert('Buka kamera terlebih dahulu.');if(coachGps.lat===null)return alert('Cek GPS terlebih dahulu agar camera stamp dapat memuat lokasi.');c.width=v.videoWidth;c.height=v.videoHeight;const ctx=c.getContext('2d');ctx.drawImage(v,0,0,c.width,c.height);drawStamp(ctx,c.width,c.height);coachPhotoData=c.toDataURL('image/jpeg',0.82);$('coachPhotoPreview').src=coachPhotoData;$('coachPhotoPreview').classList.remove('hidden');$('coachVideo').classList.add('hidden');$('coachAttendanceStatus').className='pulse-status good';$('coachAttendanceStatus').textContent='Foto + camera stamp berhasil dibuat. Tekan Hadirkan Pelatih.';if(coachStream){coachStream.getTracks().forEach(t=>t.stop());coachStream=null}}
 let coachGps={lat:null,lng:null,accuracy:null};
 function checkCoachGPS(){if(!navigator.geolocation)return alert('Perangkat tidak mendukung GPS.');$('gpsStatus').textContent='Mencari lokasi...';navigator.geolocation.getCurrentPosition(p=>{coachGps={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy};$('gpsStatus').textContent=`${coachGps.lat.toFixed(6)}, ${coachGps.lng.toFixed(6)} • akurasi ±${Math.round(coachGps.accuracy)} m`;$('coachAttendanceStatus').className='pulse-status neutral';$('coachAttendanceStatus').textContent=coachPhotoData?'GPS siap + foto siap. Tekan Hadirkan Pelatih.':'GPS siap. Ambil foto selfie.'},e=>{$('gpsStatus').textContent='GPS gagal: '+e.message}, {enableHighAccuracy:true,timeout:15000,maximumAge:0})}
-async function saveCoachAttendance(){if(!coachPhotoData)return alert('Ambil foto/selfie terlebih dahulu.');if(coachGps.lat===null)return alert('Cek lokasi GPS terlebih dahulu.');const row={id:String(Date.now()),session_id:$('coachSession')?.value||'',location_name:$('coachLocation').value.trim()||'Lokasi Latihan',latitude:coachGps.lat,longitude:coachGps.lng,accuracy:coachGps.accuracy,selfie_url:coachPhotoData,status:'HADIR'};const local=readLocal('sipas_coach_attendance',[]);local.push({...row,date:new Date().toISOString().slice(0,10),time:new Date().toLocaleTimeString('id-ID'),photo_data:coachPhotoData});localStorage.setItem('sipas_coach_attendance',JSON.stringify(local));let saved=null;if(API_URL)saved=await api('saveCoachAttendance',{row});alert(saved?'Absensi pelatih tersimpan dan dikirim ke server.':'Absensi pelatih tersimpan di perangkat. Sinkronkan saat koneksi tersedia.');coachPhotoData='';coachGps={lat:null,lng:null,accuracy:null};$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.remove('hidden');$('gpsStatus').textContent='Belum dicek';$('coachAttendanceStatus').className='pulse-status neutral';$('coachAttendanceStatus').textContent='Absensi berikutnya membutuhkan GPS dan foto.'}
+async function saveCoachAttendance(){if(!coachPhotoData)return alert('Ambil foto/selfie terlebih dahulu.');if(coachGps.lat===null)return alert('Cek lokasi GPS terlebih dahulu.');const row={id:String(Date.now()),session_id:$('coachSession')?.value||'',location_name:$('coachLocation').value.trim()||'Lokasi Latihan',latitude:coachGps.lat,longitude:coachGps.lng,accuracy:coachGps.accuracy,selfie_url:coachPhotoData,status:'HADIR'};const local=readLocal('sipas_coach_attendance',[]);local.push({...row,date:new Date().toISOString().slice(0,10),time:new Date().toLocaleTimeString('id-ID'),photo_data:coachPhotoData});localStorage.setItem('sipas_coach_attendance',JSON.stringify(local));let saved=null;if(API_URL)saved=await api('saveCoachAttendance',{row});alert(saved?'Absensi pelatih tersimpan dan dikirim ke server.':'Absensi pelatih tersimpan di perangkat. Sinkronkan saat koneksi tersedia.');coachPhotoData='';coachGps={lat:null,lng:null,accuracy:null};coachFacingMode='user';$('coachPhotoPreview').classList.add('hidden');$('cameraPlaceholder').classList.remove('hidden');$('gpsStatus').textContent='Belum dicek';$('coachAttendanceStatus').className='pulse-status neutral';$('coachAttendanceStatus').textContent='Absensi berikutnya membutuhkan GPS dan foto.'}
 function bindPulseInputs(){['mPulseBefore','mPulseAfter'].forEach(id=>$(id).addEventListener('input',updatePulseUI));updatePulseUI()}
 function updatePulseUI(){const b=Number($('mPulseBefore')?.value||0),a=Number($('mPulseAfter')?.value||0);if($('mPulseBeforeBpm'))$('mPulseBeforeBpm').textContent=b?`${b*4} BPM`:'— BPM';if($('mPulseAfterBpm'))$('mPulseAfterBpm').textContent=a?`${a*4} BPM`:'— BPM';const el=$('pulseStatus');if(!el)return;if(!b||!a){el.className='pulse-status neutral';el.textContent='Masukkan kedua hitungan nadi untuk melihat perubahan.';return}const diff=(a-b)*4;if(diff<0){el.className='pulse-status good';el.textContent=`Recovery baik • ${Math.abs(diff)} BPM lebih rendah setelah latihan.`}else if(diff<=20){el.className='pulse-status good';el.textContent=`Perubahan +${diff} BPM • dalam pemantauan normal.`}else if(diff<=40){el.className='pulse-status warn';el.textContent=`Perubahan +${diff} BPM • perlu dipantau.`}else if(diff<=60){el.className='pulse-status orange';el.textContent=`Perubahan +${diff} BPM • pantau kondisi atlet.`}else{el.className='pulse-status bad';el.textContent=`Perubahan +${diff} BPM • perhatian lebih diperlukan.`}}
 async function saveEval(){const n=$('eAthlete').value,s=$('eStage').value;if(!n)return alert('Pilih atlet.');const scores={};document.querySelectorAll('.score').forEach(x=>{if(x.value)scores[x.dataset.ind]=+x.value});if(Object.keys(scores).length!==12)return alert('Isi semua 12 indikator.');ev=ev.filter(x=>!(x.athlete===n&&x.stage===s));const avg=Object.values(scores).reduce((a,b)=>a+b,0)/12,row={id:String(Date.now()),athlete:n,stage:s,scores,avg,note:$('eNote').value};ev.push(row);persist();const saved=API_URL?await api('saveEvaluation',{row}):null;alert(saved?'Evaluasi tersimpan di perangkat dan server.':'Evaluasi tersimpan di perangkat. Sinkronkan saat online.');evalHistory();overview()}
